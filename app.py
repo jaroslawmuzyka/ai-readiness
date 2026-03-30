@@ -120,8 +120,14 @@ commentary_db = {
     "3xx_redirects": "Wewnętrzne przekierowania spowalniają pracę robotów, zużywając niepotrzebnie zasoby na podążanie za łańcuchem odnośników. Preferowane są bezpośrednie linki do docelowych zasobów.", 
     "meta_description": "Meta descriptions dostarczają modelom AI zwięzłego podsumowania zawartości strony. Pomaga to w szybszym zrozumieniu kontekstu i może być wykorzystane do generowania fragmentów odpowiedzi.",
     "js_content": "Roboty wyszukiwarek i AI preferują treści dostępne bezpośrednio w kodzie HTML. Jeśli kluczowe informacje pojawiają się dopiero po wykonaniu skryptów JavaScript, może to opóźnić ich indeksowanie lub, w przypadku mniej zaawansowanych botów, całkowicie uniemożliwić ich odczytanie.", 
-    "schema_data": "Dane strukturalne (Schema) to 'język ojczysty' sztucznej inteligencji. Używanie znaczników Schema (np. Article, FAQPage, Organization) pozwala precyzyjnie opisać zawartość strony w sposób zrozumiały dla maszyn. To jeden z najważniejszych czynników, który pozwala AI zrozumieć kontekst i fakty, co bezpośrednio przekłada się na jakość generowanych odpowiedzi.",
-    "Czy w ustawieniach kanału na Youtube włączona jest opcja \"Zezwalaj firmom zewnętrznym na trenowanie modeli AI przy użyciu treści z mojego kanału\"?": "YouTube umożliwia twórcom zablokowanie możliwości wykorzystywania ich filmów do trenowania modeli AI przez podmioty trzecie. Wyłączenie tej opcji chroni unikalną wartość intelektualną kanału i zapobiega 'rozmywaniu' autorytetu twórcy w masowych odpowiedziach generatywnych.",
+    "Czy strona jest dodana w Google Search Console?": "GSC pozwala monitorować indeksację, widoczność w Google i pomaga wykrywać błędy techniczne na stronie. To nie jest czynnik rankingowy lecz ułatwia analizę widocznosci i wykrywanie błędów.",
+    "Czy strona jest dodana w Bing Webmaster Tools?": "Bing Webmaster Tools daje dostęp do danych o cytowaniach w AI (AI Performance).",
+    "Czy dodane jest 'Organization' schema z adresami 'sameAs' kierującymi do profili społecznościowych?": "Pomaga LLM jednoznacznie zidentyfikować encję marki i powiązać ją z zewnętrznymi źródłami, co zwiększa wiarygodność i poprawność informacji w odpowiedziach AI.",
+    "Czy dodane jest 'Article' schema na wpisach blogowych?": "Ułatwia modelom zrozumienie struktury i kontekstu treści, dzięki czemu łatwiej wyciągają konkretne informacje do odpowiedzi.",
+    "Czy dodane jest 'Author' schema na wpisach blogowych i podlinkowane do profili autorów?": "Wzmacnia sygnały E-E-A-T, co jest kluczowe dla LLM przy wyborze wiarygodnych źródeł, szczególnie w tematach eksperckich (np. zdrowie, finanse).",
+    "Czy autorzy mają stworzone dedykowane podstrony z 'ProfilePage' schema?": "Pozwala modelom lepiej zrozumieć, kim są autorzy i jakie mają kompetencje.",
+    "Czy dodane jest 'Breadcrumb' schema?": "Pomaga modelom zrozumieć kontekst i hierarchię strony.",
+    "Czy w ustawieniach kanału na Youtube włączona jest opcja \"Zezwalaj firmom zewnętrznym na trenowanie modeli AI przy użyciu treści z mojego kanału\"?": "Umożliwia wykorzystanie treści wideo przez systemy AI, co zwiększa szansę na ich uwzględnienie w odpowiedziach LLM i rozszerza obecność marki poza stroną.",
 }
 
 # --- HELPER FUNCTIONS ---
@@ -205,6 +211,7 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
     def html_table_centered(df, title, url_cols=None, cwv_kind=None):
         """Tabela HTML z wysródkowaniem i ew. kolorowaniem CWV."""
         if df is None or df.empty: return ""
+        df = df.fillna('-')
         if url_cols is None: url_cols = []
         rows_html = ""
         header_html = ""
@@ -273,13 +280,17 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift']
             # Screaming Frog może mieć FCP lub INP (Interaction to Next Paint)
             inp_col = 'Interaction to Next Paint (ms)' if 'Interaction to Next Paint (ms)' in df_sf.columns else 'First Contentful Paint Time (ms)'
+            
+            # Filtrowanie tylko Status Code 200 dla CWV
+            df_sf_200 = df_sf[df_sf['Status Code'] == 200] if 'Status Code' in df_sf.columns else df_sf
+            
             if all(c in df_sf.columns for c in cwv_cols + ([inp_col] if inp_col in df_sf.columns else [])):
                 html += "<h3>Core Web Vitals</h3>"
-                html += html_table_centered(df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)", cwv_kind='LCP')
-                html += html_table_centered(df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)", cwv_kind='CLS')
+                html += html_table_centered(df_sf_200[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)", cwv_kind='LCP')
+                html += html_table_centered(df_sf_200[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)", cwv_kind='CLS')
                 if inp_col in df_sf.columns:
                     label = "Interaktywność (INP)" if "Interaction" in inp_col else "Pierwsze wyrenderowanie (FCP)"
-                    html += html_table_centered(df_sf[['Address', inp_col]].sort_values(by=inp_col, ascending=False).head(5), f"{label}", cwv_kind='INP')
+                    html += html_table_centered(df_sf_200[['Address', inp_col]].sort_values(by=inp_col, ascending=False).head(5), f"{label}", cwv_kind='INP')
             if 'Status Code' in df_sf.columns:
                 err4xx = df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)]
                 if not err4xx.empty: html += html_table_centered(err4xx[['Address', 'Status Code']].head(10), f"Strony zwracające błąd 4xx ({len(err4xx)})")
@@ -469,7 +480,7 @@ with tabs[3]:
     for q in social_q:
         if "trenowanie modeli AI przy użyciu treści" in q:
             st.markdown(f"**{q}**\n👉 [Instrukcja jak to zrobić](https://support.google.com/youtube/answer/15509944?sjid=13268001827056761517-EU&hl=pl)")
-            ans = st.selectbox("Odpowiedź:", ["— Wybierz —", "✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}")
+            ans = st.selectbox("Odpowiedź:", ["— Wybierz —", "✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q))
             if ans == "💬 Własny komentarz":
                 ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}")
         elif "podaj link" in q:
@@ -505,7 +516,7 @@ with tabs[5]:
     st.subheader("🧠 Analiza Semantyczna Pojedynczego Wpisu")
     st.markdown("""Ta zakładka opisuje **dodatkową, płatną usługę audytu Content Intelligence** — pogłębioną analizę pojedynczego artykułu pod kątem algorytmów Google i modeli AI takich jak ChatGPT czy Google AI Overviews.
     
-> 💡 Zainteresowany? Skontaktuj się z nami, aby otrzymać wycenę analizy dla swoich kluczowych treści.""", unsafe_allow_html=False)
+> 💡 Do indywidualnej wyceny.""", unsafe_allow_html=False)
     st.divider()
 
     with st.expander("🎯 Wstęp: Jak Google i AI czytają Twoje treści?", expanded=True):
@@ -600,6 +611,11 @@ System, którym Google ocenia wiarygodność Twoją i Twojej strony. W branżach
 # --- TAB 6: Generuj Raport ---
 with tabs[6]:
     st.subheader("Finalizacja")
+    st.info("""
+📝 Plik DOCX — sprawdź formatowanie tabel, odstępy między sekcjami oraz poprawność wstawionych zdjęć (loga, screeny).
+🌐 Plik HTML/PDF — otwórz w przeglądarce i użyj Ctrl+P → "Zapisz jako PDF".
+📊 Plik XLSX — zawiera pełne dane techniczne. Możesz dołączyć go jako osobny załącznik do raportu.
+    """)
     if st.button("🚀 GENERUJ RAPORT (DOCX + XLSX)", type="primary"):
         if not analyzed_url:
             st.error("Podaj adres URL strony!")
@@ -710,6 +726,7 @@ with tabs[6]:
                         document.add_heading(title, level=3)
                         if df is None or df.empty:
                             document.add_paragraph("Nie znaleziono danych spełniających kryteria."); return
+                        df = df.fillna('-')
                         table = document.add_table(rows=1, cols=len(df.columns)); table.style = 'Table Grid'
                         hdr_cells = table.rows[0].cells
                         for i, column_name in enumerate(df.columns):
@@ -815,19 +832,22 @@ with tabs[6]:
                             cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift']
                             inp_col = 'Interaction to Next Paint (ms)' if 'Interaction to Next Paint (ms)' in df_sf.columns else 'First Contentful Paint Time (ms)'
                             
+                            # Filtrowanie tylko Status Code 200 dla CWV
+                            df_sf_200 = df_sf[df_sf['Status Code'] == 200] if 'Status Code' in df_sf.columns else df_sf
+                            
                             if all(c in df_sf.columns for c in cwv_cols):
                                 doc.add_heading('7.2. Szybkość strony (Core Web Vitals)', level=2)
                                 add_strategic_commentary(doc, 'core_web_vitals', commentary_db)
                                 
-                                lcp_df = df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5)
+                                lcp_df = df_sf_200[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5)
                                 add_styled_table(doc, lcp_df, "Najwolniejsze strony (LCP)", cwv_kind='LCP')
                                 
-                                cls_df = df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5)
+                                cls_df = df_sf_200[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5)
                                 add_styled_table(doc, cls_df, "Strony z najwyższym przesunięciem (CLS)", cwv_kind='CLS')
                                 
                                 if inp_col in df_sf.columns:
                                     inp_label = "Interaktywność (INP)" if "Interaction" in inp_col else "Pierwsze ładowanie treści (FCP)"
-                                    inp_df = df_sf[['Address', inp_col]].sort_values(by=inp_col, ascending=False).head(5)
+                                    inp_df = df_sf_200[['Address', inp_col]].sort_values(by=inp_col, ascending=False).head(5)
                                     add_styled_table(doc, inp_df, f"Najwolniejsze: {inp_label}", cwv_kind='INP')
 
                             # Errors 4xx
@@ -890,6 +910,8 @@ with tabs[6]:
                                 add_styled_table(doc, schema_disp.head(10), "Znalezione elementy Schema (Top 10)")
                                 doc.add_paragraph("Pełne błędy, ostrzeżenia i wszystkie wykryte typy schema dla wszystkich adresów znajdują się w dołączonym arkuszu XLSX.")
 
+                    doc.add_paragraph("\nPełne dane dotyczące błędów technicznych znajdują się w pliku XLSX.").runs[0].font.italic = True
+
                     # 3. XLSX Generation
                     xlsx_buffer = io.BytesIO()
                     with pd.ExcelWriter(xlsx_buffer, engine='openpyxl') as writer:
@@ -902,13 +924,15 @@ with tabs[6]:
                             df_ahrefs = read_data_file(ahrefs_file)
                             if df_ahrefs is not None:
                                 ahrefs_keep = [c for c in ['Keyword', 'Volume', 'Current position', 'Current URL', 'Current URL inside'] if c in df_ahrefs.columns]
-                                df_ahrefs[ahrefs_keep].to_excel(writer, sheet_name='Ahrefs_AI_Overview_Full', index=False)
+                                df_ahrefs[ahrefs_keep].fillna('-').to_excel(writer, sheet_name='Ahrefs_AI_Overview_Full', index=False)
                         
                         # 3. Senuto
                         if senuto_file:
-                            df_senuto = read_data_file(senuto_file)
-                            if df_senuto is not None:
-                                df_senuto.to_excel(writer, sheet_name='Senuto_AI_Overview_Full', index=False)
+                            df_senuto_f = read_data_file(senuto_file)
+                            if df_senuto_f is not None:
+                                if 'Widoczność' in df_senuto_f.columns:
+                                    df_senuto_f = df_senuto_f.drop(columns=['Widoczność'])
+                                df_senuto_f.fillna('-').to_excel(writer, sheet_name='Senuto_AI_Overview_Full', index=False)
                                 
                         # 4. Screaming Frog Data Breakdown
                         if sf_file:
@@ -917,25 +941,28 @@ with tabs[6]:
                                 # Nieindeksowalne — 4 kolumny
                                 if 'Indexability' in df_sf.columns:
                                     ni_cols = [c for c in ['Address', 'Status Code', 'Indexability', 'Canonical Link Element 1'] if c in df_sf.columns]
-                                    df_sf[df_sf['Indexability'] == 'Non-Indexable'][ni_cols].to_excel(writer, sheet_name='Nieindeksowalne', index=False)
+                                    df_sf[df_sf['Indexability'] == 'Non-Indexable'][ni_cols].fillna('-').to_excel(writer, sheet_name='Nieindeksowalne', index=False)
                                 # 4xx — 2 kolumny
                                 if 'Status Code' in df_sf.columns:
                                     err4_cols = [c for c in ['Address', 'Status Code'] if c in df_sf.columns]
-                                    df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)][err4_cols].to_excel(writer, sheet_name='Bledy_4xx', index=False)
+                                    df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)][err4_cols].fillna('-').to_excel(writer, sheet_name='Bledy_4xx', index=False)
                                     # 3xx — 3 kolumny
                                     err3_cols = [c for c in ['Address', 'Status Code', 'Redirect URL'] if c in df_sf.columns]
-                                    df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)][err3_cols].to_excel(writer, sheet_name='Przekierowania_3xx', index=False)
+                                    df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)][err3_cols].fillna('-').to_excel(writer, sheet_name='Przekierowania_3xx', index=False)
                                 # CWV
                                 cwv_cols_xlsx = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift']
                                 inp_col_xlsx = 'Interaction to Next Paint (ms)' if 'Interaction to Next Paint (ms)' in df_sf.columns else 'First Contentful Paint Time (ms)'
                                 
+                                # Filtrowanie tylko Status Code 200 dla CWV
+                                df_sf_200 = df_sf[df_sf['Status Code'] == 200] if 'Status Code' in df_sf.columns else df_sf
+                                
                                 if 'Largest Contentful Paint Time (ms)' in df_sf.columns:
-                                    df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_LCP', index=False)
+                                    df_sf_200[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).fillna('-').to_excel(writer, sheet_name='CWV_LCP', index=False)
                                 if 'Cumulative Layout Shift' in df_sf.columns:
-                                    df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).to_excel(writer, sheet_name='CWV_CLS', index=False)
+                                    df_sf_200[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).fillna('-').to_excel(writer, sheet_name='CWV_CLS', index=False)
                                 if inp_col_xlsx in df_sf.columns:
                                     sn = 'CWV_INP' if 'Interaction' in inp_col_xlsx else 'CWV_FCP'
-                                    df_sf[['Address', inp_col_xlsx]].sort_values(by=inp_col_xlsx, ascending=False).to_excel(writer, sheet_name=sn, index=False)
+                                    df_sf_200[['Address', inp_col_xlsx]].sort_values(by=inp_col_xlsx, ascending=False).fillna('-').to_excel(writer, sheet_name=sn, index=False)
                         
                         # 5. JS Analysis — 5 kolumn, posortowane wg JS Word Count % + zaokraglone
                         if js_file:
@@ -946,7 +973,7 @@ with tabs[6]:
                                 if 'JS Word Count %' in df_js_out.columns:
                                     df_js_out['JS Word Count %'] = df_js_out['JS Word Count %'].round(0).astype(int, errors='ignore')
                                     df_js_out = df_js_out.sort_values(by='JS Word Count %', ascending=False)
-                                df_js_out.to_excel(writer, sheet_name='Zaleznosc_od_JS', index=False)
+                                df_js_out.fillna('-').to_excel(writer, sheet_name='Zaleznosc_od_JS', index=False)
                                 
                         # 6. Schema — posortowane: Indexable pierwsze
                         if schema_file:
@@ -1019,6 +1046,8 @@ with tabs[6]:
                             for col_i, width in col_widths.items():
                                 ws.column_dimensions[get_column_letter(col_i)].width = width
 
+                    doc.add_paragraph("\nPełne dane dotyczące błędów technicznych znajdują się w pliku XLSX.").runs[0].font.italic = True
+                    
                     # Final export
                     doc_io = io.BytesIO()
                     doc.save(doc_io)
@@ -1114,7 +1143,8 @@ def load_example_data():
         "Czy w ciągu ostatniego miesiaca został dodany materiał na Facebook?",
         "Czy w ciągu ostatniego miesiaca został dodany materiał na Instagram?",
         "Czy w ciągu ostatniego miesiaca został dodany materiał na Tiktok?",
-        "Czy w ciągu ostatniego miesiaca został dodany materiał na Youtube?"
+        "Czy w ciągu ostatniego miesiaca został dodany materiał na Youtube?",
+        "Czy w ustawieniach kanału na Youtube włączona jest opcja \"Zezwalaj firmom zewnętrznym na trenowanie modeli AI przy użyciu treści z mojego kanału\"?"
     ]
     for q in social_questions:
         if "podaj link" in q:
