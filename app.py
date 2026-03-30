@@ -12,6 +12,7 @@ import os
 import requests
 import cairosvg
 import traceback
+import base64
 from PIL import Image
 
 # 1. Page Configuration
@@ -154,7 +155,13 @@ def read_data_file(file):
         except: return None
     return None
 
-def generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, df_sf, df_ahrefs, df_senuto, df_schema, df_js, client_name, analyzed_url):
+def get_base64_img(file):
+    if file is None: return None
+    try:
+        return f"data:image/png;base64,{base64.b64encode(file.getvalue()).decode()}"
+    except: return None
+
+def generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, df_sf, df_ahrefs, df_senuto, df_schema, df_js, client_name, analyzed_url, gsc_img=None, ga_img=None, lb_img=None):
     html = f"""<!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -243,13 +250,24 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             rows_html += f"<tr>{row_html}</tr>"
             
         link_html = ""
-        if cwv_kind == 'LCP': link_html = " <br><a href='https://web.dev/articles/lcp?hl=pl' style='font-size:0.65em; text-decoration:none;' target='_blank'>[📚 web.dev/lcp]</a>"
-        elif cwv_kind == 'CLS': link_html = " <br><a href='https://web.dev/articles/cls?hl=pl' style='font-size:0.65em; text-decoration:none;' target='_blank'>[📚 web.dev/cls]</a>"
-        elif cwv_kind in ('INP', 'FCP'): link_html = " <br><a href='https://web.dev/articles/inp?hl=pl' style='font-size:0.65em; text-decoration:none;' target='_blank'>[📚 web.dev/inp]</a>"
+        if cwv_kind == 'LCP': link_html = " <br><br><a href='https://web.dev/articles/lcp?hl=pl' style='font-size:0.75em; text-decoration:none;' target='_blank'>[📚 web.dev/lcp]</a>"
+        elif cwv_kind == 'CLS': link_html = " <br><br><a href='https://web.dev/articles/cls?hl=pl' style='font-size:0.75em; text-decoration:none;' target='_blank'>[📚 web.dev/cls]</a>"
+        elif cwv_kind in ('INP', 'FCP'): link_html = " <br><br><a href='https://web.dev/articles/inp?hl=pl' style='font-size:0.75em; text-decoration:none;' target='_blank'>[📚 web.dev/inp]</a>"
         
-        return f"<h3>{title}{link_html}</h3><div class='table-wrap'><table><thead><tr>{header_html}</tr></thead><tbody>{rows_html}</tbody></table></div>"
+        return f"<h3>{title}</h3><div class='table-wrap'><table><thead><tr>{header_html}</tr></thead><tbody>{rows_html}</tbody></table></div>{link_html}"
 
-    html += section("1. Crawling i Indeksowanie", tech_answers)
+    if gsc_img or ga_img:
+        html += "<h2>1. Analiza widoczności i ruchu</h2>"
+        if gsc_img:
+            html += "<h3>1.1. Widoczność w Google Search Console</h3>"
+            b64 = get_base64_img(gsc_img)
+            if b64: html += f"<div style='margin:20px 0;'><img src='{b64}' style='max-width:100%; border-radius:8px; border:1px solid var(--border-color);'></div>"
+        if ga_img:
+            html += "<h3>1.2. Ruch z LLM w Google Analytics 4</h3>"
+            b64 = get_base64_img(ga_img)
+            if b64: html += f"<div style='margin:20px 0;'><img src='{b64}' style='max-width:100%; border-radius:8px; border:1px solid var(--border-color);'></div>"
+
+    html += section("2. Crawling i Indeksowanie", tech_answers)
     if robots_text:
         robots_clean = "\n".join([line for line in robots_text.replace('\r', '').split('\n') if line.strip()])
         html += f"<h3>Zawartość pliku robots.txt:</h3><div class='robots-code'>{robots_clean}</div>"
@@ -257,6 +275,10 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
     html += section("2. Treści", content_answers)
     html += section("3. Social Media", social_answers)
     html += section("4. Linkbuilding", lb_answers)
+    if lb_img:
+        html += "<h3>4.1. Profil linków (Ahrefs)</h3>"
+        b64 = get_base64_img(lb_img)
+        if b64: html += f"<div style='margin:20px 0;'><img src='{b64}' style='max-width:100%; border-radius:8px; border:1px solid var(--border-color);'></div>"
 
     html += "<h2>5. Analiza potencjału w AI Overviews</h2>"
     if df_ahrefs is not None and len(df_ahrefs.columns) > 1 and 'Current URL inside' in df_ahrefs.columns:
@@ -326,7 +348,9 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             df_s = df_schema[df_schema['Indexability'] == 'Indexable'].sort_values('Address', ascending=True)
             t_cols = [c for c in df_s.columns if c.startswith('Type-')][:5]
             html += html_table_centered(df_s[['Address'] + t_cols].fillna('-').head(10), "Dane Strukturalne (Schema)")
+            html += "<p style='font-size:0.9em; color:#555;'>Pełne błędy, ostrzeżenia i wszystkie wykryte typy schema dla wszystkich adresów znajdują się w dołączonym arkuszu XLSX.</p>"
 
+    html += "<p style='margin-top:40px; font-style:italic; color:#666; border-top:1px solid var(--border-color); padding-top:20px;'>Pełne dane dotyczące błędów technicznych znajdują się w pliku XLSX.</p>"
     html += "</div></body></html>"
     return html
 
@@ -610,12 +634,6 @@ System, którym Google ocenia wiarygodność Twoją i Twojej strony. W branżach
 
 # --- TAB 6: Generuj Raport ---
 with tabs[6]:
-    st.subheader("Finalizacja")
-    st.info("""
-📝 Plik DOCX — sprawdź formatowanie tabel, odstępy między sekcjami oraz poprawność wstawionych zdjęć (loga, screeny).
-🌐 Plik HTML/PDF — otwórz w przeglądarce i użyj Ctrl+P → "Zapisz jako PDF".
-📊 Plik XLSX — zawiera pełne dane techniczne. Możesz dołączyć go jako osobny załącznik do raportu.
-    """)
     if st.button("🚀 GENERUJ RAPORT (DOCX + XLSX)", type="primary"):
         if not analyzed_url:
             st.error("Podaj adres URL strony!")
@@ -683,11 +701,9 @@ with tabs[6]:
                         if gsc_img:
                             doc.add_heading('1.1. Widoczność w Google Search Console', level=2)
                             doc.add_picture(io.BytesIO(gsc_img.getvalue()), width=Inches(6.0))
-                            doc.add_paragraph("<tutaj_dodaj_komentarz>").runs[0].font.italic = True
                         if ga_img:
                             doc.add_heading('1.2. Ruch z LLM w Google Analytics 4', level=2)
                             doc.add_picture(io.BytesIO(ga_img.getvalue()), width=Inches(6.0))
-                            doc.add_paragraph("<tutaj_dodaj_komentarz>").runs[0].font.italic = True
 
                     # Helper for sections (Nested definition for scoped access or move outside)
                     def build_q_and_a_section(document, title, answers, commentary_db, robots_content=""):
@@ -752,9 +768,9 @@ with tabs[6]:
                                     for run in p.runs:
                                         if not run.font.bold: run.font.size = Pt(8)
                                         
-                        if cwv_kind == 'LCP': p = document.add_paragraph('Podpowiedź LCP: '); p.add_run('https://web.dev/articles/lcp?hl=pl').font.italic = True
-                        elif cwv_kind == 'CLS': p = document.add_paragraph('Podpowiedź CLS: '); p.add_run('https://web.dev/articles/cls?hl=pl').font.italic = True
-                        elif cwv_kind in ('INP', 'FCP'): p = document.add_paragraph('Podpowiedź INP: '); p.add_run('https://web.dev/articles/inp?hl=pl').font.italic = True
+                        if cwv_kind == 'LCP': document.add_paragraph(); p = document.add_paragraph(); p.add_run('🔗 https://web.dev/articles/lcp?hl=pl').font.italic = True
+                        elif cwv_kind == 'CLS': document.add_paragraph(); p = document.add_paragraph(); p.add_run('🔗 https://web.dev/articles/cls?hl=pl').font.italic = True
+                        elif cwv_kind in ('INP', 'FCP'): document.add_paragraph(); p = document.add_paragraph(); p.add_run('🔗 https://web.dev/articles/inp?hl=pl').font.italic = True
                         
                         document.add_paragraph()
 
@@ -883,7 +899,6 @@ with tabs[6]:
                         df_sf_meta = read_data_file(sf_file)
                         if df_sf_meta is not None and all(c in df_sf_meta.columns for c in ['Status Code', 'Meta Description 1']):
                             doc.add_heading('7.6. Analiza Meta Description', level=2)
-                            doc.add_paragraph('Analiza meta description dla stron zwracających kod 200.').runs[0].font.italic = True
                             df200m = df_sf_meta[df_sf_meta['Status Code'] == 200][['Address', 'Meta Description 1']].copy()
                             empty_md = df200m[df200m['Meta Description 1'].isna() | (df200m['Meta Description 1'].astype(str).str.strip() == '')]
                             dupl_md = df200m[df200m.duplicated(subset=['Meta Description 1'], keep=False) & df200m['Meta Description 1'].notna() & (df200m['Meta Description 1'].astype(str).str.strip() != '')]
@@ -908,7 +923,6 @@ with tabs[6]:
                                 cols_to_show = ['Address'] + type_cols
                                 schema_disp = df_s[cols_to_show].fillna('-')
                                 add_styled_table(doc, schema_disp.head(10), "Znalezione elementy Schema (Top 10)")
-                                doc.add_paragraph("Pełne błędy, ostrzeżenia i wszystkie wykryte typy schema dla wszystkich adresów znajdują się w dołączonym arkuszu XLSX.")
 
                     doc.add_paragraph("\nPełne dane dotyczące błędów technicznych znajdują się w pliku XLSX.").runs[0].font.italic = True
 
@@ -1046,8 +1060,6 @@ with tabs[6]:
                             for col_i, width in col_widths.items():
                                 ws.column_dimensions[get_column_letter(col_i)].width = width
 
-                    doc.add_paragraph("\nPełne dane dotyczące błędów technicznych znajdują się w pliku XLSX.").runs[0].font.italic = True
-                    
                     # Final export
                     doc_io = io.BytesIO()
                     doc.save(doc_io)
@@ -1066,7 +1078,7 @@ with tabs[6]:
                     _df_senuto = read_data_file(senuto_file) if senuto_file else None
                     _df_schema = read_data_file(schema_file) if schema_file else None
                     _df_js = read_data_file(js_file) if js_file else None
-                    st.session_state['ready_html'] = generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, _df_sf, _df_ahrefs, _df_senuto, _df_schema, _df_js, client_name, analyzed_url)
+                    st.session_state['ready_html'] = generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, _df_sf, _df_ahrefs, _df_senuto, _df_schema, _df_js, client_name, analyzed_url, gsc_img, ga_img, lb_img)
                     
                 except Exception as e:
                     st.error(f"Błąd podczas generowania: {e}")
