@@ -177,7 +177,7 @@ def add_strategic_commentary(document, key, commentary_db):
 st.title("🚀 AI Readiness Report Generator")
 st.markdown("Automatyczne narzędzie do audytu gotowości witryny na zmiany w ekosystemie AI (SGE/AIO).")
 
-tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "🤖 Opinie i LLM", "📄 Generuj Raport"])
+tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "📄 Generuj Raport"])
 
 # --- TAB 1: Dane Podstawowe ---
 with tabs[0]:
@@ -278,24 +278,8 @@ with tabs[2]:
         lb_answers[q] = st.selectbox(q, ["Tak", "Nie", "Wymaga analizy"], key=f"lb_{q}")
     lb_img = st.file_uploader("Screen z Ahrefs (Backlink profile):", type=['png', 'jpg', 'jpeg'])
 
-# --- TAB 4: Opinie i LLM ---
+# --- TAB 4: Generuj Raport ---
 with tabs[3]:
-    st.info("Poniższe sekcje służą do ręcznego wpisania wyników testów w modelach LLM.")
-    llm_models = ["ChatGPT", "Gemini", "Claude", "Perplexity", "Grok", "DeepSeek", "Bing (Copilot)"]
-    
-    st.subheader("Jakie są opinie o marce?")
-    opinie_data = {}
-    for model in llm_models:
-        opinie_data[model] = st.text_area(f"Opinia w {model}:", placeholder="Wklej tutaj odpowiedź modelu...", height=100, key=f"op_{model}")
-        
-    st.divider()
-    st.subheader("Zgodność informacji")
-    zgodnosc_data = {}
-    for model in llm_models:
-        zgodnosc_data[model] = st.text_area(f"Zgodność w {model}:", placeholder="Czy informacje są prawdziwe?", height=100, key=f"zg_{model}")
-
-# --- TAB 5: Generuj Raport ---
-with tabs[4]:
     st.subheader("Finalizacja")
     if st.button("🚀 GENERUJ RAPORT (DOCX + XLSX)", type="primary"):
         if not analyzed_url:
@@ -454,19 +438,6 @@ with tabs[4]:
                             add_styled_table(doc, df_schema.head(10), "Podgląd danych Schema")
                             add_strategic_commentary(doc, 'schema_data', commentary_db)
 
-                    # LLM Sections
-                    doc.add_heading('8. Opinie LLM', level=1)
-                    for model, text in opinie_data.items():
-                        if text:
-                            doc.add_heading(f"Opinia: {model}", level=2)
-                            doc.add_paragraph(text)
-
-                    doc.add_heading('9. Zgodność informacji', level=1)
-                    for model, text in zgodnosc_data.items():
-                        if text:
-                            doc.add_heading(f"Zgodność: {model}", level=2)
-                            doc.add_paragraph(text)
-                    
                     # 3. XLSX Generation
                     xlsx_buffer = io.BytesIO()
                     with pd.ExcelWriter(xlsx_buffer, engine='openpyxl') as writer:
@@ -563,12 +534,6 @@ def load_example_data():
     ]
     for q in lb_questions:
         st.session_state[f"lb_{q}"] = "Tak"
-    # LLM Options
-    llm_models_list = ["ChatGPT", "Gemini", "Claude", "Perplexity", "Grok", "DeepSeek", "Bing (Copilot)"]
-    for model in llm_models_list:
-        st.session_state[f"op_{model}"] = "Marka Oral-B według modelu AI jest powszechnie uznawana za jednego z najpopularniejszych liderów zaufania z dziedziny pielęgnacji jamy ustnej. Rekomendowana przez dentystów na całym świecie..."
-        st.session_state[f"zg_{model}"] = "Większość wygenerowanych danych technicznych jest w pełnej zgodności ze stanem faktycznym i rynkową wiedzą ekspercką."
-
 if st.sidebar.button("✨ Uzupełnij formularz", on_click=load_example_data):
     st.sidebar.success("Formularz wypełniony danymi Oral-B!")
 
