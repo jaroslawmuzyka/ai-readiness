@@ -287,6 +287,23 @@ with tabs[3]:
         else:
             with st.spinner("Przetwarzanie danych i generowanie plików..."):
                 try:
+                    class MockFile:
+                        def __init__(self, path):
+                            import os
+                            self.name = os.path.basename(path)
+                            with open(path, "rb") as f: self.data = f.read()
+                        def getvalue(self): return self.data
+                    
+                    if st.session_state.get("use_example_files"):
+                        try:
+                            if sf_file is None: sf_file = MockFile("example/internal_html oralb.xlsx")
+                            if ahrefs_file is None: ahrefs_file = MockFile("example/oralb.pl-organic-keywords-subdomains-pl--a_2026-02-16_21-13-42.csv")
+                            if senuto_file is None: senuto_file = MockFile("example/analiza_widoczno_ci_raport_s_owa_kluczowe_ai_overviews___domain___2026_02_16_21_14.xlsx")
+                            if schema_file is None: schema_file = MockFile("example/structured_data_all - oralb.xlsx")
+                            if logo_file is None: logo_file = MockFile("example/logo-oralb.png")
+                        except Exception as mock_err:
+                            pass
+
                     # 1. Image preprocessing
                     logo_bytes = None
                     if logo_file:
@@ -539,6 +556,7 @@ st.sidebar.markdown("Zobacz jak wygląda gotowy raport lub przetestuj narzędzie
 def load_example_data():
     st.session_state["url_input"] = "https://oralb.pl"
     st.session_state["client_input"] = "Oral-B"
+    st.session_state["use_example_files"] = True
     # Tech
     for i in range(19):
         st.session_state[f"tech_{i}"] = "Tak"
