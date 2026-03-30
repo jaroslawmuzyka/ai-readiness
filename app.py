@@ -121,6 +121,7 @@ commentary_db = {
     "meta_description": "Meta descriptions dostarczają modelom AI zwięzłego podsumowania zawartości strony. Pomaga to w szybszym zrozumieniu kontekstu i może być wykorzystane do generowania fragmentów odpowiedzi.",
     "js_content": "Roboty wyszukiwarek i AI preferują treści dostępne bezpośrednio w kodzie HTML. Jeśli kluczowe informacje pojawiają się dopiero po wykonaniu skryptów JavaScript, może to opóźnić ich indeksowanie lub, w przypadku mniej zaawansowanych botów, całkowicie uniemożliwić ich odczytanie.", 
     "schema_data": "Dane strukturalne (Schema) to 'język ojczysty' sztucznej inteligencji. Używanie znaczników Schema (np. Article, FAQPage, Organization) pozwala precyzyjnie opisać zawartość strony w sposób zrozumiały dla maszyn. To jeden z najważniejszych czynników, który pozwala AI zrozumieć kontekst i fakty, co bezpośrednio przekłada się na jakość generowanych odpowiedzi.",
+    "Czy w ustawieniach kanału na Youtube włączona jest opcja \"Zezwalaj firmom zewnętrznym na trenowanie modeli AI przy użyciu treści z mojego kanału\"?": "YouTube umożliwia twórcom zablokowanie możliwości wykorzystywania ich filmów do trenowania modeli AI przez podmioty trzecie. Wyłączenie tej opcji chroni unikalną wartość intelektualną kanału i zapobiega 'rozmywaniu' autorytetu twórcy w masowych odpowiedziach generatywnych.",
 }
 
 # --- HELPER FUNCTIONS ---
@@ -201,8 +202,8 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             if q in commentary_db: s += f"<div class='commentary'>{commentary_db[q]}</div>"
         return s
 
-    def html_table_centered(df, title, url_cols=None):
-        """Tabela HTML z wysródkowaniem kolumn nie-URL."""
+    def html_table_centered(df, title, url_cols=None, cwv_kind=None):
+        """Tabela HTML z wysródkowaniem i ew. kolorowaniem CWV."""
         if df is None or df.empty: return ""
         if url_cols is None: url_cols = []
         rows_html = ""
@@ -216,9 +217,30 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             for col, val in zip(df.columns, row):
                 is_url = any(u.lower() in str(col).lower() for u in ['url', 'address', 'adres'])
                 css = " class='center'" if not is_url and col not in url_cols else ""
-                row_html += f"<td{css}>{val}</td>"
+                
+                disp_val = val
+                if cwv_kind and not is_url:
+                    try:
+                        v = float(str(val).replace(',', '.'))
+                        bg = None
+                        if cwv_kind == 'LCP':
+                            bg = '#27ae60' if v <= 2500 else '#f39c12' if v <= 4000 else '#e74c3c'
+                        elif cwv_kind == 'CLS':
+                            bg = '#27ae60' if v <= 0.1 else '#f39c12' if v <= 0.25 else '#e74c3c'
+                        elif cwv_kind in ('INP', 'FCP'):
+                            bg = '#27ae60' if v <= 200 else '#f39c12' if v <= 500 else '#e74c3c'
+                        if bg: disp_val = f"<span style='background:{bg}; color:white; padding:3px 8px; border-radius:4px; font-weight:bold;'>{val}</span>"
+                    except: pass
+                
+                row_html += f"<td{css}>{disp_val}</td>"
             rows_html += f"<tr>{row_html}</tr>"
-        return f"<h3>{title}</h3><div class='table-wrap'><table><thead><tr>{header_html}</tr></thead><tbody>{rows_html}</tbody></table></div>"
+            
+        link_html = ""
+        if cwv_kind == 'LCP': link_html = " <br><a href='https://web.dev/articles/lcp?hl=pl' style='font-size:0.65em; text-decoration:none;' target='_blank'>[📚 web.dev/lcp]</a>"
+        elif cwv_kind == 'CLS': link_html = " <br><a href='https://web.dev/articles/cls?hl=pl' style='font-size:0.65em; text-decoration:none;' target='_blank'>[📚 web.dev/cls]</a>"
+        elif cwv_kind in ('INP', 'FCP'): link_html = " <br><a href='https://web.dev/articles/inp?hl=pl' style='font-size:0.65em; text-decoration:none;' target='_blank'>[📚 web.dev/inp]</a>"
+        
+        return f"<h3>{title}{link_html}</h3><div class='table-wrap'><table><thead><tr>{header_html}</tr></thead><tbody>{rows_html}</tbody></table></div>"
 
     html += section("1. Crawling i Indeksowanie", tech_answers)
     if robots_text:
@@ -248,12 +270,16 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             if 'Indexability' in df_sf.columns:
                 non_idx = df_sf[df_sf['Indexability'] == 'Non-Indexable'][['Address', 'Indexability Status', 'Status Code']]
                 html += html_table_centered(non_idx, f"Strony nieindeksowalne ({len(non_idx)})")
-            cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift', 'First Contentful Paint Time (ms)']
-            if all(c in df_sf.columns for c in cwv_cols):
+            cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift']
+            # Screaming Frog może mieć FCP lub INP (Interaction to Next Paint)
+            inp_col = 'Interaction to Next Paint (ms)' if 'Interaction to Next Paint (ms)' in df_sf.columns else 'First Contentful Paint Time (ms)'
+            if all(c in df_sf.columns for c in cwv_cols + ([inp_col] if inp_col in df_sf.columns else [])):
                 html += "<h3>Core Web Vitals</h3>"
-                html += html_table_centered(df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)")
-                html += html_table_centered(df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)")
-                html += html_table_centered(df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze ładowanie treści (FCP)")
+                html += html_table_centered(df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)", cwv_kind='LCP')
+                html += html_table_centered(df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)", cwv_kind='CLS')
+                if inp_col in df_sf.columns:
+                    label = "Interaktywność (INP)" if "Interaction" in inp_col else "Pierwsze wyrenderowanie (FCP)"
+                    html += html_table_centered(df_sf[['Address', inp_col]].sort_values(by=inp_col, ascending=False).head(5), f"{label}", cwv_kind='INP')
             if 'Status Code' in df_sf.columns:
                 err4xx = df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)]
                 if not err4xx.empty: html += html_table_centered(err4xx[['Address', 'Status Code']].head(10), f"Strony zwracające błąd 4xx ({len(err4xx)})")
@@ -331,9 +357,25 @@ tabs = st.tabs(["📌 Instrukcja", "📁 Dane Podstawowe", "🔧 Audyt Techniczn
 with tabs[0]:
     st.subheader("📌 Instrukcja korzystania z narzędzia")
     st.markdown("""
-    ### Skorzystaj ze Screaming Frog
+    Aby wygenerować kompletny raport, przygotuj następujące pliki z narzędzi:
 
-    Szczegółowe instrukcje dotyczące wymaganych plików zostaną tutaj dodane wkrótce.
+    1. **Screaming Frog (Główny audyt)**:
+        - Uruchom Spidera na domenie.
+        - Wyeksportuj listę adresów: `Internal` -> `HTML` (kliknij Export).
+        - To jest główny plik wrzucany w pole "Plik z audytem Screaming Frog".
+
+    2. **Screaming Frog (JavaScript Analysis)**:
+        - Włącz `Configuration` -> `Spider` -> `Extraction` -> `JavaScript Content Analysis`.
+        - Przejdź do zakładki `Content` i wyeksportuj `JavaScript Content Analysis`.
+        - Plik wrzuć w pole "SF (JS Content Analysis)".
+
+    3. **Screaming Frog (Structured Data)**:
+        - Włącz `Configuration` -> `Spider` -> `Extraction` -> `Structured Data`.
+        - Eksportuj zakładkę `Structured Data` -> `All Structured Data`.
+        - Plik wrzuć w pole "SF (Structured Data)".
+
+    4. **Ahrefs / Senuto**:
+        - Wyeksportuj raporty słów kluczowych, które wyzwalają funkcję "AI Overview".
     """, unsafe_allow_html=False)
 
 # --- TAB 1: Dane Podstawowe ---
@@ -420,18 +462,26 @@ with tabs[3]:
         "Czy w ciągu ostatniego miesiaca został dodany materiał na Facebook?",
         "Czy w ciągu ostatniego miesiaca został dodany materiał na Instagram?",
         "Czy w ciągu ostatniego miesiaca został dodany materiał na Tiktok?",
-        "Czy w ciągu ostatniego miesiaca został dodany materiał na Youtube?"
+        "Czy w ciągu ostatniego miesiaca został dodany materiał na Youtube?",
+        "Czy w ustawieniach kanału na Youtube włączona jest opcja \"Zezwalaj firmom zewnętrznym na trenowanie modeli AI przy użyciu treści z mojego kanału\"?"
     ]
     social_answers = {}
     for q in social_q:
-        if "podaj link" in q:
+        if "trenowanie modeli AI przy użyciu treści" in q:
+            st.markdown(f"**{q}**\n👉 [Instrukcja jak to zrobić](https://support.google.com/youtube/answer/15509944?sjid=13268001827056761517-EU&hl=pl)")
+            ans = st.selectbox("Odpowiedź:", ["— Wybierz —", "✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}")
+            if ans == "💬 Własny komentarz":
+                ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}")
+        elif "podaj link" in q:
             social_answers[q] = st.text_input(q, key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
+            continue
         else:
             ans = st.selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
             if ans == "💬 Własny komentarz":
-                ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}")
-            clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
-            social_answers[q] = clean
+                ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}") # Fix key conflict if any
+        
+        clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
+        social_answers[q] = clean
 
 # --- TAB 4: Linkbuilding ---
 with tabs[4]:
@@ -656,7 +706,7 @@ with tabs[6]:
                             else:
                                 add_strategic_commentary(document, question, commentary_db)
 
-                    def add_styled_table(document, df, title):
+                    def add_styled_table(document, df, title, cwv_kind=None):
                         document.add_heading(title, level=3)
                         if df is None or df.empty:
                             document.add_paragraph("Nie znaleziono danych spełniających kryteria."); return
@@ -666,13 +716,29 @@ with tabs[6]:
                             p = hdr_cells[i].paragraphs[0]; run = p.add_run(str(column_name)); run.font.bold = True; run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF); set_cell_shading(hdr_cells[i], "003366")
                         for index, row in df.head(10).iterrows(): # Limit to top 10 for visibility
                             row_cells = table.add_row().cells
-                            for i, cell_value in enumerate(row): row_cells[i].text = str(cell_value)
+                            for i, (col_name, cell_value) in enumerate(zip(df.columns, row)):
+                                val_str = str(cell_value)
+                                bg = None
+                                if cwv_kind and 'Address' not in str(col_name) and 'URL' not in str(col_name):
+                                    try:
+                                        v = float(val_str.replace(',', '.'))
+                                        if cwv_kind == 'LCP': bg = '27ae60' if v <= 2500 else 'f39c12' if v <= 4000 else 'e74c3c'
+                                        elif cwv_kind == 'CLS': bg = '27ae60' if v <= 0.1 else 'f39c12' if v <= 0.25 else 'e74c3c'
+                                        elif cwv_kind in ('INP', 'FCP'): bg = '27ae60' if v <= 200 else 'f39c12' if v <= 500 else 'e74c3c'
+                                    except: pass
+                                row_cells[i].text = val_str
+                                if bg: set_cell_shading(row_cells[i], bg)
                         for row in table.rows:
                             for cell in row.cells:
                                 for p in cell.paragraphs:
                                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                                     for run in p.runs:
                                         if not run.font.bold: run.font.size = Pt(8)
+                                        
+                        if cwv_kind == 'LCP': p = document.add_paragraph('Podpowiedź LCP: '); p.add_run('https://web.dev/articles/lcp?hl=pl').font.italic = True
+                        elif cwv_kind == 'CLS': p = document.add_paragraph('Podpowiedź CLS: '); p.add_run('https://web.dev/articles/cls?hl=pl').font.italic = True
+                        elif cwv_kind in ('INP', 'FCP'): p = document.add_paragraph('Podpowiedź INP: '); p.add_run('https://web.dev/articles/inp?hl=pl').font.italic = True
+                        
                         document.add_paragraph()
 
                     # Sections
@@ -746,19 +812,23 @@ with tabs[6]:
                                 add_styled_table(doc, non_idx, f"Strony nieindeksowalne ({len(non_idx)})")
                             
                             # CWV
-                            cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift', 'First Contentful Paint Time (ms)']
+                            cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift']
+                            inp_col = 'Interaction to Next Paint (ms)' if 'Interaction to Next Paint (ms)' in df_sf.columns else 'First Contentful Paint Time (ms)'
+                            
                             if all(c in df_sf.columns for c in cwv_cols):
-                                doc.add_heading('7.2. Core Web Vitals', level=2)
+                                doc.add_heading('7.2. Szybkość strony (Core Web Vitals)', level=2)
                                 add_strategic_commentary(doc, 'core_web_vitals', commentary_db)
                                 
                                 lcp_df = df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5)
-                                add_styled_table(doc, lcp_df, "Najwolniejsze strony (LCP)")
+                                add_styled_table(doc, lcp_df, "Najwolniejsze strony (LCP)", cwv_kind='LCP')
                                 
                                 cls_df = df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5)
-                                add_styled_table(doc, cls_df, "Strony z najwyższym przesunięciem (CLS)")
+                                add_styled_table(doc, cls_df, "Strony z najwyższym przesunięciem (CLS)", cwv_kind='CLS')
                                 
-                                fcp_df = df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).head(5)
-                                add_styled_table(doc, fcp_df, "Najwolniejsze ładowanie treści (FCP)")
+                                if inp_col in df_sf.columns:
+                                    inp_label = "Interaktywność (INP)" if "Interaction" in inp_col else "Pierwsze ładowanie treści (FCP)"
+                                    inp_df = df_sf[['Address', inp_col]].sort_values(by=inp_col, ascending=False).head(5)
+                                    add_styled_table(doc, inp_df, f"Najwolniejsze: {inp_label}", cwv_kind='INP')
 
                             # Errors 4xx
                             if 'Status Code' in df_sf.columns:
@@ -856,12 +926,16 @@ with tabs[6]:
                                     err3_cols = [c for c in ['Address', 'Status Code', 'Redirect URL'] if c in df_sf.columns]
                                     df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)][err3_cols].to_excel(writer, sheet_name='Przekierowania_3xx', index=False)
                                 # CWV
+                                cwv_cols_xlsx = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift']
+                                inp_col_xlsx = 'Interaction to Next Paint (ms)' if 'Interaction to Next Paint (ms)' in df_sf.columns else 'First Contentful Paint Time (ms)'
+                                
                                 if 'Largest Contentful Paint Time (ms)' in df_sf.columns:
                                     df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_LCP', index=False)
                                 if 'Cumulative Layout Shift' in df_sf.columns:
                                     df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).to_excel(writer, sheet_name='CWV_CLS', index=False)
-                                if 'First Contentful Paint Time (ms)' in df_sf.columns:
-                                    df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_FCP', index=False)
+                                if inp_col_xlsx in df_sf.columns:
+                                    sn = 'CWV_INP' if 'Interaction' in inp_col_xlsx else 'CWV_FCP'
+                                    df_sf[['Address', inp_col_xlsx]].sort_values(by=inp_col_xlsx, ascending=False).to_excel(writer, sheet_name=sn, index=False)
                         
                         # 5. JS Analysis — 5 kolumn, posortowane wg JS Word Count % + zaokraglone
                         if js_file:
@@ -914,12 +988,30 @@ with tabs[6]:
                                 col_name = str(cell.value or '')
                                 if any(u in col_name.lower() for u in ['address', 'url', 'redirect']):
                                     url_like_cols.add(i)
-                                col_widths[i] = max(len(col_name), 10)
+                                col_widths[i] = max(int(len(col_name) * 1.5) + 2, 12)
                             for row in ws.iter_rows(min_row=2):
                                 for cell in row:
                                     col_i = cell.column
                                     val_len = len(str(cell.value or ''))
-                                    col_widths[col_i] = min(max(col_widths.get(col_i, 10), val_len + 2), 60)
+                                    # Bardziej agresywne wyliczanie szerokości (1.4x + offset)
+                                    col_widths[col_i] = min(max(col_widths.get(col_i, 12), int(val_len * 1.4) + 2), 110)
+                                    # Kolorowanie CWV
+                                    if sheetname.startswith('CWV_') and col_i == 2:
+                                        try:
+                                            v = float(str(cell.value).replace(',', '.'))
+                                            fill_color = None
+                                            if 'LCP' in sheetname:
+                                                fill_color = "27ae60" if v <= 2500 else "f39c12" if v <= 4000 else "e74c3c"
+                                            elif 'CLS' in sheetname:
+                                                fill_color = "27ae60" if v <= 0.1 else "f39c12" if v <= 0.25 else "e74c3c"
+                                            elif 'FCP' in sheetname or 'INP' in sheetname:
+                                                fill_color = "27ae60" if v <= 200 else "f39c12" if v <= 500 else "e74c3c"
+                                            
+                                            if fill_color:
+                                                cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+                                                cell.font = Font(color="FFFFFF", bold=True)
+                                        except: pass
+                                        
                                     if col_i in url_like_cols:
                                         cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
                                     else:
