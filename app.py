@@ -132,7 +132,7 @@ def read_data_file(file):
     
     if filename.lower().endswith('.csv'):
         encodings = ['utf-8-sig', 'utf-16', 'utf-8', 'latin-1']
-        separators = [';', ',']
+        separators = [';', ',', '\t']
         for encoding in encodings:
             for sep in separators:
                 try:
@@ -397,14 +397,33 @@ with tabs[3]:
                             status_icon = "✅" if "tak" in str(a).lower() else "➡️"
                             p.add_run(f"{status_icon} {a}")
 
+                    # Linkbuilding Section
+                    doc.add_heading('5. Linkbuilding', level=1)
+                    add_strategic_commentary(doc, 'linkbuilding_general', commentary_db)
+                    for q, a in lb_answers.items():
+                        doc.add_heading(str(q), level=2)
+                        status_icon = "✅" if "tak" in str(a).lower() else "❌" if "nie" in str(a).lower() else "➡️"
+                        doc.add_paragraph(f"{status_icon} {a}")
+                    
+                    if lb_img:
+                        doc.add_heading('5.1. Profil linków (Ahrefs)', level=2)
+                        doc.add_picture(io.BytesIO(lb_img.getvalue()), width=Inches(6.0))
+
                     # Ahrefs / Senuto Data
+                    doc.add_heading('6. Analiza potencjału w AI Overviews', level=1)
                     if ahrefs_file:
                         df_ahrefs = read_data_file(ahrefs_file)
                         if df_ahrefs is not None:
-                            doc.add_heading('6. Analiza potencjału w AI Overviews (Ahrefs)', level=1)
+                            doc.add_heading('6.1. Zasięgi globalne (Ahrefs)', level=2)
                             if 'Current URL inside' in df_ahrefs.columns:
                                 df_ahrefs_ai = df_ahrefs[df_ahrefs['Current URL inside'] == 'AI Overview'].sort_values(by='Organic traffic', ascending=False)
                                 add_styled_table(doc, df_ahrefs_ai.head(5), "Top 5 fraz z AI Overview")
+                    
+                    if senuto_file:
+                        df_senuto = read_data_file(senuto_file)
+                        if df_senuto is not None:
+                            doc.add_heading('6.2. Widoczność lokalna (Senuto)', level=2)
+                            add_styled_table(doc, df_senuto.iloc[:, :4].head(5), "Top 5 fraz - Senuto")
 
                     # Screaming Frog Data
                     if sf_file:
@@ -415,8 +434,9 @@ with tabs[3]:
                             # non-indexable
                             if 'Indexability' in df_sf.columns:
                                 non_idx = df_sf[df_sf['Indexability'] == 'Non-Indexable'][['Address', 'Indexability Status', 'Status Code']]
-                                add_styled_table(doc, non_idx, f"Strony nieindeksowalne ({len(non_idx)})")
+                                doc.add_heading('7.1. Strony nieindeksowalne', level=2)
                                 add_strategic_commentary(doc, 'non_indexable', commentary_db)
+                                add_styled_table(doc, non_idx, f"Strony nieindeksowalne ({len(non_idx)})")
                             
                             # CWV
                             cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift', 'First Contentful Paint Time (ms)']
@@ -430,20 +450,22 @@ with tabs[3]:
                             if 'Status Code' in df_sf.columns:
                                 err4xx = df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)]
                                 if not err4xx.empty:
-                                    add_styled_table(doc, err4xx[['Address', 'Status Code']].head(10), f"Błędy 4xx ({len(err4xx)})")
-                                add_strategic_commentary(doc, '4xx_errors', commentary_db)
+                                    doc.add_heading('7.3. Błędy 4xx', level=2)
+                                    add_strategic_commentary(doc, '4xx_errors', commentary_db)
+                                    add_styled_table(doc, err4xx[['Address', 'Status Code']].head(10), f"Strony zwracające błąd 4xx ({len(err4xx)})")
                                 
                                 err3xx = df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)]
                                 if not err3xx.empty:
-                                    add_styled_table(doc, err3xx[['Address', 'Redirect URL']].head(10), f"Przekierowania 3xx ({len(err3xx)})")
-                                add_strategic_commentary(doc, '3xx_redirects', commentary_db)
+                                    doc.add_heading('7.4. Przekierowania 3xx', level=2)
+                                    add_strategic_commentary(doc, '3xx_redirects', commentary_db)
+                                    add_styled_table(doc, err3xx[['Address', 'Redirect URL']].head(10), f"Strony z przekierowaniem 3xx ({len(err3xx)})")
 
                     if schema_file:
                         df_schema = read_data_file(schema_file)
                         if df_schema is not None:
-                            doc.add_heading('7.7. Dane Strukturalne (Schema)', level=2)
-                            add_styled_table(doc, df_schema.head(10), "Podgląd danych Schema")
+                            doc.add_heading('7.5. Dane Strukturalne (Schema)', level=2)
                             add_strategic_commentary(doc, 'schema_data', commentary_db)
+                            add_styled_table(doc, df_schema.iloc[:, :3].head(10), "Podgląd najistotniejszych danych Schema")
 
                     # 3. XLSX Generation
                     xlsx_buffer = io.BytesIO()
@@ -460,6 +482,10 @@ with tabs[3]:
                             df_ahrefs = read_data_file(ahrefs_file)
                             if df_ahrefs is not None:
                                 df_ahrefs.to_excel(writer, sheet_name='Ahrefs AIO', index=False)
+                        if senuto_file:
+                            df_senuto = read_data_file(senuto_file)
+                            if df_senuto is not None:
+                                df_senuto.to_excel(writer, sheet_name='Senuto AIO', index=False)
 
                         # Styling XLSX z kolorami brandowymi
                         header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
