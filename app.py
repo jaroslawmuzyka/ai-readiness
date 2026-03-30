@@ -1071,6 +1071,8 @@ with tabs[6]:
                                 col_name = str(cell.value or '')
                                 if any(u in col_name.lower() for u in ['address', 'url', 'redirect']):
                                     url_like_cols.add(i)
+                                if sheetname == 'MetaDesc_Duplikaty' and 'meta description' in col_name.lower():
+                                    url_like_cols.add(i)
                                 col_widths[i] = max(int(len(col_name) * 1.5) + 2, 12)
                             for row in ws.iter_rows(min_row=2):
                                 for cell in row:
