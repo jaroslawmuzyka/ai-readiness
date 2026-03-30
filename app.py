@@ -395,7 +395,7 @@ with tabs[0]:
 Wszystkie pola w formularzu są opcjonalne. Jeśli czegoś nie chcesz umieszczać w raporcie AI Readiness to nie musisz uzupełniać konkretnego pola. Im więcej pól uzupełnisz tym większą wartość przekażemy dla klienta :)
     """)
     st.divider()
-    st.markdown("### Punkty 1-3 możesz uzupełnić ręcznie lub skorzystać z gotowego CONFIGU do Screaming Frog")
+    st.markdown("### Punkty 1-3 możesz uzupełnić ręcznie lub skorzystać z gotowego pliku konfiguracyjnego do Screaming Frog")
     
     try:
         with open("Config AI Readiness.seospiderconfig", "rb") as f:
@@ -444,7 +444,7 @@ Będziesz potrzebować danych z zakładek:
 
     st.divider()
     st.markdown("""
-**6. Po ukończonym crawlu możesz w górnym menu nacisnąć "Crawl Analysis" żeby wykryć czy na stronie znajdują się np duplikaty treści.**
+**6. Po ukończonym crawlu możesz w górnym menu nacisnąć "Crawl Analysis" żeby sprawdzić czy na stronie znajdują się np duplikaty treści.**
 
 **7. Pobierz dane z Ahrefs o widoczności w AI Overview** - [link do Ahrefs](https://app.ahrefs.com/v2-site-explorer/organic-keywords?brandedMode=all&chartGranularity=monthly&chartInterval=all&chartMetric=Keywords&compareDate=dontCompare&country=allGlobal&currentDate=today&dataMode=keywords&hiddenColumns=AllIntents%7C%7CCPC%7C%7CEntities%7C%7CKD%7C%7COtherIntents%7C%7CPaidTraffic%7C%7CPositionHistory%7C%7CSF%7C%7CUserIntents&intentsAttrs=&keywordRules=&limit=100&localMode=all&mainOnly=0&mode=subdomains&multipleUrlsOnly=0&offset=0&performanceChartTopPosition=top11_20%7C%7Ctop21_50%7C%7Ctop3%7C%7Ctop4_10%7C%7Ctop51&positionChanges=&projectId=2396345&serpMatch=%5B%22All%22%5D&serpRules=%7B%22comparisonMode%22%3A%5B%22Current%22%5D%2C%22mode%22%3A%22ranked%22%2C%22features%22%3A%5B%22ai_overview%22%5D%2C%22featuresMatchType%22%3A%5B%22All%22%5D%7D&sort=OrganicTrafficInitial&sortDirection=desc&target=oralb.pl%2F&urlRules=&volume_type=average)
 
