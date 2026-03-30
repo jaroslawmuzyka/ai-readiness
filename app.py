@@ -147,7 +147,7 @@ def read_data_file(file):
         except: return None
     return None
 
-def generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, df_sf, df_ahrefs, df_senuto, df_schema, client_name, analyzed_url):
+def generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, df_sf, df_ahrefs, df_senuto, df_schema, df_js, client_name, analyzed_url):
     html = f"""<!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -157,18 +157,23 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
     <style>
         :root {{ --primary: #003366; --secondary: #006699; --tertiary: #FF9900; --light: #F5F7FA; --primary-light: #e6f0fa; --border-color: #ccd9e8; }}
         body {{ font-family: 'Manrope', sans-serif; background-color: var(--light); color: #2d3436; padding: 40px 20px; line-height: 1.6; margin: 0; }}
-        .container {{ max-width: 900px; margin: 0 auto; background: white; padding: 60px; border-radius: 16px; border-top: 8px solid var(--primary); box-shadow: 0 15px 35px rgba(0,0,0,0.08); }}
+        .container {{ max-width: 960px; margin: 0 auto; background: white; padding: 60px; border-radius: 16px; border-top: 8px solid var(--primary); box-shadow: 0 15px 35px rgba(0,0,0,0.08); }}
         h1, h2, h3 {{ font-family: 'Manrope', sans-serif; color: var(--primary); font-weight: 800; letter-spacing: -0.02em; margin-top: 1.5em; }}
         h1 {{ font-size: 2.8rem; border-bottom: 2px solid var(--light); padding-bottom: 20px; margin-top: 0; }}
         h2 {{ font-size: 1.8rem; border-left: 6px solid var(--tertiary); padding-left: 15px; color: var(--secondary); }}
         h3 {{ font-size: 1.4rem; }}
-        table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin: 30px 0; font-size: 0.88rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); table-layout: fixed; word-wrap: break-word; }}
+        .table-wrap {{ width: 100%; overflow-x: auto; margin: 30px 0; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }}
         thead {{ background-color: var(--primary); color: white; }}
-        th {{ padding: 12px 10px; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; word-break: break-word; }}
-        td {{ padding: 10px; border-bottom: 1px solid var(--border-color); vertical-align: top; overflow-wrap: break-word; word-break: break-all; max-width: 300px; }}
+        th {{ padding: 12px 10px; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; }}
+        th.center {{ text-align: center; }}
+        td {{ padding: 10px; border-bottom: 1px solid var(--border-color); vertical-align: middle; word-break: break-word; }}
+        td.center {{ text-align: center; }}
         tr:nth-child(even) {{ background-color: var(--primary-light); }}
         .commentary {{ background: var(--light); border-left: 6px solid var(--secondary); padding: 20px 30px; margin: 30px 0; font-style: italic; color: var(--primary); border-radius: 0 8px 8px 0; }}
-        .robots-code {{ background-color: #f0f0f0; color: #2d3436; padding: 20px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap; line-height: 1.1; }}
+        .robots-code {{ background-color: #f0f0f0; color: #2d3436; padding: 20px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; line-height: 1.4; }}
+        .badge-ok {{ background:#27ae60; color:white; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; }}
+        .badge-warn {{ background:#e67e22; color:white; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; }}
         @media print {{
             @page {{ margin: 1.5cm; size: A4; }}
             body {{ background: white; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
@@ -192,9 +197,28 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
             if q == "Czy linki przychodzące kierują do stron 404?" and "tak" in str(a).lower(): icon = "❌"
             s += f"<h3>{str(q).replace('(podaj link)', '').strip()}</h3>"
             if str(a).startswith('http'): s += f"<p>{icon} <a href='{a}'>{a}</a></p>"
-            else: s += f"<p>{icon} {a}</p>"
+            else: s += f"<p>{icon} {a if a else 'Nie uzupełniono'}</p>"
             if q in commentary_db: s += f"<div class='commentary'>{commentary_db[q]}</div>"
         return s
+
+    def html_table_centered(df, title, url_cols=None):
+        """Tabela HTML z wysródkowaniem kolumn nie-URL."""
+        if df is None or df.empty: return ""
+        if url_cols is None: url_cols = []
+        rows_html = ""
+        header_html = ""
+        for col in df.columns:
+            is_url = any(u.lower() in str(col).lower() for u in ['url', 'address', 'adres'])
+            css = "" if is_url or col in url_cols else " class='center'"
+            header_html += f"<th{css.replace('class=', ' class=')}>{col}</th>"
+        for _, row in df.iterrows():
+            row_html = ""
+            for col, val in zip(df.columns, row):
+                is_url = any(u.lower() in str(col).lower() for u in ['url', 'address', 'adres'])
+                css = " class='center'" if not is_url and col not in url_cols else ""
+                row_html += f"<td{css}>{val}</td>"
+            rows_html += f"<tr>{row_html}</tr>"
+        return f"<h3>{title}</h3><div class='table-wrap'><table><thead><tr>{header_html}</tr></thead><tbody>{rows_html}</tbody></table></div>"
 
     html += section("1. Crawling i Indeksowanie", tech_answers)
     if robots_text:
@@ -205,43 +229,66 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
     html += section("3. Social Media", social_answers)
     html += section("4. Linkbuilding", lb_answers)
 
-    def html_table(df, title):
-        if df is None or df.empty: return ""
-        return f"<h3>{title}</h3>\n" + df.to_html(index=False, border=0, classes="")
-
     html += "<h2>5. Analiza potencjału w AI Overviews</h2>"
     if df_ahrefs is not None and len(df_ahrefs.columns) > 1 and 'Current URL inside' in df_ahrefs.columns:
         df_ai = df_ahrefs[df_ahrefs['Current URL inside'].astype(str).str.contains('AI Overview', case=False, na=False)].sort_values(by='Volume', ascending=False)
-        html += html_table(df_ai[['Keyword', 'Volume', 'Current position', 'Current URL']].rename(columns={'Keyword': 'Słowo kluczowe', 'Volume': 'Wolumen', 'Current position': 'Pozycja organiczna', 'Current URL': 'URL'}).head(10), "Widoczność AI Overview - Ahrefs")
+        disp = df_ai[['Keyword', 'Volume', 'Current position', 'Current URL']].rename(columns={'Keyword': 'Słowo kluczowe', 'Volume': 'Wolumen', 'Current position': 'Pozycja organiczna', 'Current URL': 'URL'}).head(10)
+        html += html_table_centered(disp, "Widoczność AI Overview - Ahrefs")
 
     if df_senuto is not None:
         scols = ['Słowo kluczowe', 'Pozycja organiczna', 'Najlepsza pozycja w AIO', 'URL najlepszej pozycji w AIO']
         avail = [c for c in scols if c in df_senuto.columns]
         if avail:
-            html += html_table(df_senuto[avail].rename(columns={'URL najlepszej pozycji w AIO': 'URL w AIO'}).head(10), "Widocznosć AI Overview - Senuto")
+            disp = df_senuto[avail].rename(columns={'URL najlepszej pozycji w AIO': 'URL w AIO'}).head(10)
+            html += html_table_centered(disp, "Widoczność AI Overview - Senuto")
 
-    if df_sf is not None or df_schema is not None:
+    if df_sf is not None or df_schema is not None or df_js is not None:
         html += "<h2>6. Analiza techniczna (Screaming Frog)</h2>"
         if df_sf is not None:
             if 'Indexability' in df_sf.columns:
-                html += html_table(df_sf[df_sf['Indexability'] == 'Non-Indexable'][['Address', 'Indexability Status', 'Status Code']], "Strony nieindeksowalne")
+                non_idx = df_sf[df_sf['Indexability'] == 'Non-Indexable'][['Address', 'Indexability Status', 'Status Code']]
+                html += html_table_centered(non_idx, f"Strony nieindeksowalne ({len(non_idx)})")
             cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift', 'First Contentful Paint Time (ms)']
             if all(c in df_sf.columns for c in cwv_cols):
                 html += "<h3>Core Web Vitals</h3>"
-                html += html_table(df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)")
-                html += html_table(df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)")
-                html += html_table(df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze ładowanie treści (FCP)")
-            
+                html += html_table_centered(df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)")
+                html += html_table_centered(df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)")
+                html += html_table_centered(df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze ładowanie treści (FCP)")
             if 'Status Code' in df_sf.columns:
                 err4xx = df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)]
-                if not err4xx.empty: html += html_table(err4xx[['Address', 'Status Code']].head(10), f"Strony zwracające błąd 4xx ({len(err4xx)})")
+                if not err4xx.empty: html += html_table_centered(err4xx[['Address', 'Status Code']].head(10), f"Strony zwracające błąd 4xx ({len(err4xx)})")
                 err3xx = df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)]
-                if not err3xx.empty: html += html_table(err3xx[['Address', 'Redirect URL']].head(10), f"Strony z przekierowaniem 3xx ({len(err3xx)})")
+                if not err3xx.empty:
+                    cols3 = [c for c in ['Address', 'Status Code', 'Redirect URL'] if c in err3xx.columns]
+                    html += html_table_centered(err3xx[cols3].head(10), f"Strony z przekierowaniem 3xx ({len(err3xx)})")
+            # Meta Description
+            if all(c in df_sf.columns for c in ['Status Code', 'Meta Description 1']):
+                df200 = df_sf[df_sf['Status Code'] == 200][['Address', 'Meta Description 1']].copy()
+                empty_md = df200[df200['Meta Description 1'].isna() | (df200['Meta Description 1'].astype(str).str.strip() == '')]
+                dupl_md = df200[df200.duplicated(subset=['Meta Description 1'], keep=False) & df200['Meta Description 1'].notna() & (df200['Meta Description 1'].astype(str).str.strip() != '')]
+                html += "<h3>Meta Opisy</h3>"
+                if empty_md.empty:
+                    html += "<p><span class='badge-ok'>✅ OK</span> Brak pustych meta description.</p>"
+                else:
+                    html += html_table_centered(empty_md.rename(columns={'Address': 'URL', 'Meta Description 1': 'Meta Description'}).head(20), f"Puste meta description ({len(empty_md)} stron)")
+                if dupl_md.empty:
+                    html += "<p><span class='badge-ok'>✅ OK</span> Brak zduplikowanych meta description.</p>"
+                else:
+                    html += html_table_centered(dupl_md.rename(columns={'Address': 'URL', 'Meta Description 1': 'Meta Description'}).sort_values('Meta Description').head(20), f"Zduplikowane meta description ({len(dupl_md)} stron)")
+
+        if df_js is not None:
+            js_cols_h = [c for c in ['Address', 'HTML Word Count', 'Rendered HTML Word Count', 'Word Count Change', 'JS Word Count %'] if c in df_js.columns]
+            if js_cols_h:
+                df_js_disp = df_js[js_cols_h].copy()
+                if 'JS Word Count %' in df_js_disp.columns:
+                    df_js_disp['JS Word Count %'] = df_js_disp['JS Word Count %'].round(0).astype(int, errors='ignore')
+                    df_js_disp = df_js_disp.sort_values(by='JS Word Count %', ascending=False)
+                html += html_table_centered(df_js_disp.head(10), "Zależność od JavaScript (Top 10)")
 
         if df_schema is not None and 'Indexability' in df_schema.columns and 'Address' in df_schema.columns:
             df_s = df_schema[df_schema['Indexability'] == 'Indexable'].sort_values('Address', ascending=True)
             t_cols = [c for c in df_s.columns if c.startswith('Type-')][:5]
-            html += html_table(df_s[['Address'] + t_cols].fillna('-').head(10), "Dane Strukturalne (Schema)")
+            html += html_table_centered(df_s[['Address'] + t_cols].fillna('-').head(10), "Dane Strukturalne (Schema)")
 
     html += "</div></body></html>"
     return html
@@ -278,10 +325,19 @@ def add_strategic_commentary(document, key, commentary_db):
 st.title("🚀 AI Readiness Report Generator")
 st.markdown("Automatyczne narzędzie do audytu gotowości witryny na zmiany w ekosystemie AI (SGE/AIO).")
 
-tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "🔗 Linkbuilding", "🧠 Analiza Semantyczna", "📄 Generuj Raport"])
+tabs = st.tabs(["📌 Instrukcja", "📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "🔗 Linkbuilding", "🧠 Analiza Semantyczna", "📄 Generuj Raport"])
+
+# --- TAB 0: Instrukcja ---
+with tabs[0]:
+    st.subheader("📌 Instrukcja korzystania z narzędzia")
+    st.markdown("""
+    ### Skorzystaj ze Screaming Frog
+
+    Szczegółowe instrukcje dotyczące wymaganych plików zostaną tutaj dodane wkrótce.
+    """, unsafe_allow_html=False)
 
 # --- TAB 1: Dane Podstawowe ---
-with tabs[0]:
+with tabs[1]:
     col1, col2 = st.columns([1, 1])
     with col1:
         analyzed_url = st.text_input("Adres analizowanej strony:", placeholder="https://example.com", key="url_input")
@@ -292,7 +348,7 @@ with tabs[0]:
             st.image(logo_file, width=150)
 
 # --- TAB 2: Audyt Techniczny ---
-with tabs[1]:
+with tabs[2]:
     st.subheader("Checklista Techniczna")
     tech_q = [
         "Czy strona jest dodana w Google Search Console?",
@@ -337,7 +393,7 @@ with tabs[1]:
     schema_file = col4.file_uploader("SF (Structured Data):", type=['csv', 'xlsx'])
 
 # --- TAB 3: Treści i Social ---
-with tabs[2]:
+with tabs[3]:
     st.subheader("Audyt Treści")
     content_q = [
         "Czy Twoje najważniejsze strony zostały zaktualizowane w ciągu ostatnich 6 miesięcy?",
@@ -378,7 +434,7 @@ with tabs[2]:
             social_answers[q] = clean
 
 # --- TAB 4: Linkbuilding ---
-with tabs[3]:
+with tabs[4]:
     st.subheader("Audyt Profilu Linków")
     lb_q = [
         "Czy autorytet strony wyrażony DR rośnie lub jest stabilny?",
@@ -395,7 +451,7 @@ with tabs[3]:
     lb_img = st.file_uploader("Screen z Ahrefs (Backlink profile):", type=['png', 'jpg', 'jpeg'])
 
 # --- TAB 5: Analiza Semantyczna ---
-with tabs[4]:
+with tabs[5]:
     st.subheader("🧠 Analiza Semantyczna Pojedynczego Wpisu")
     st.markdown("""Ta zakładka opisuje **dodatkową, płatną usługę audytu Content Intelligence** — pogłębioną analizę pojedynczego artykułu pod kątem algorytmów Google i modeli AI takich jak ChatGPT czy Google AI Overviews.
     
@@ -492,7 +548,7 @@ System, którym Google ocenia wiarygodność Twoją i Twojej strony. W branżach
 """)
 
 # --- TAB 6: Generuj Raport ---
-with tabs[5]:
+with tabs[6]:
     st.subheader("Finalizacja")
     if st.button("🚀 GENERUJ RAPORT (DOCX + XLSX)", type="primary"):
         if not analyzed_url:
@@ -724,12 +780,31 @@ with tabs[5]:
                         if df_js is not None:
                             js_cols_docx = [c for c in ['Address', 'HTML Word Count', 'Rendered HTML Word Count', 'Word Count Change', 'JS Word Count %'] if c in df_js.columns]
                             if js_cols_docx:
-                                doc.add_heading('7.5. Zale\u017cno\u015b\u0107 od JavaScript', level=2)
+                                doc.add_heading('7.5. Zależność od JavaScript', level=2)
                                 add_strategic_commentary(doc, 'js_content', commentary_db)
-                                df_js_docx = df_js[js_cols_docx]
+                                df_js_docx = df_js[js_cols_docx].copy()
                                 if 'JS Word Count %' in df_js_docx.columns:
+                                    df_js_docx['JS Word Count %'] = df_js_docx['JS Word Count %'].round(0).astype(int, errors='ignore')
                                     df_js_docx = df_js_docx.sort_values(by='JS Word Count %', ascending=False)
-                                add_styled_table(doc, df_js_docx.head(10), "Top 10 stron z najwy\u017csz\u0105 zale\u017cno\u015bci\u0105 od JS")
+                                add_styled_table(doc, df_js_docx.head(10), "Top 10 stron z najwyższą zależnością od JS")
+
+                    # Meta Description (DOCX)
+                    if sf_file:
+                        df_sf_meta = read_data_file(sf_file)
+                        if df_sf_meta is not None and all(c in df_sf_meta.columns for c in ['Status Code', 'Meta Description 1']):
+                            doc.add_heading('7.6. Analiza Meta Description', level=2)
+                            doc.add_paragraph('Analiza meta description dla stron zwracających kod 200.').runs[0].font.italic = True
+                            df200m = df_sf_meta[df_sf_meta['Status Code'] == 200][['Address', 'Meta Description 1']].copy()
+                            empty_md = df200m[df200m['Meta Description 1'].isna() | (df200m['Meta Description 1'].astype(str).str.strip() == '')]
+                            dupl_md = df200m[df200m.duplicated(subset=['Meta Description 1'], keep=False) & df200m['Meta Description 1'].notna() & (df200m['Meta Description 1'].astype(str).str.strip() != '')]
+                            if not empty_md.empty:
+                                add_styled_table(doc, empty_md.rename(columns={'Address': 'URL', 'Meta Description 1': 'Meta Description'}).head(20), f"Puste Meta Description ({len(empty_md)} stron)")
+                            else:
+                                doc.add_paragraph('✅ Brak pustych meta description.')
+                            if not dupl_md.empty:
+                                add_styled_table(doc, dupl_md.rename(columns={'Address': 'URL', 'Meta Description 1': 'Meta Description'}).sort_values('Meta Description').head(20), f"Zduplikowane Meta Description ({len(dupl_md)} stron)")
+                            else:
+                                doc.add_paragraph('✅ Brak zduplikowanych meta description.')
 
                     if schema_file:
                         df_schema = read_data_file(schema_file)
@@ -788,13 +863,14 @@ with tabs[5]:
                                 if 'First Contentful Paint Time (ms)' in df_sf.columns:
                                     df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_FCP', index=False)
                         
-                        # 5. JS Analysis — 5 kolumn, posortowane wg JS Word Count %
+                        # 5. JS Analysis — 5 kolumn, posortowane wg JS Word Count % + zaokraglone
                         if js_file:
                             df_js = read_data_file(js_file)
                             if df_js is not None:
                                 js_cols = [c for c in ['Address', 'HTML Word Count', 'Rendered HTML Word Count', 'Word Count Change', 'JS Word Count %'] if c in df_js.columns]
-                                df_js_out = df_js[js_cols]
+                                df_js_out = df_js[js_cols].copy()
                                 if 'JS Word Count %' in df_js_out.columns:
+                                    df_js_out['JS Word Count %'] = df_js_out['JS Word Count %'].round(0).astype(int, errors='ignore')
                                     df_js_out = df_js_out.sort_values(by='JS Word Count %', ascending=False)
                                 df_js_out.to_excel(writer, sheet_name='Zaleznosc_od_JS', index=False)
                                 
@@ -803,19 +879,53 @@ with tabs[5]:
                             df_schema = read_data_file(schema_file)
                             if df_schema is not None:
                                 if 'Indexability' in df_schema.columns:
-                                    df_schema_sorted = df_schema.sort_values('Indexability', ascending=True)  # Indexable < Non-Indexable alfabetycznie
+                                    df_schema_sorted = df_schema.sort_values('Indexability', ascending=True)
                                     df_schema_sorted.to_excel(writer, sheet_name='Implementacja_Schema', index=False)
                                 else:
                                     df_schema.to_excel(writer, sheet_name='Implementacja_Schema', index=False)
 
-                        # Styling XLSX z kolorami brandowymi
+                        # 7. Meta Description — pusty i zduplikowane
+                        if sf_file:
+                            df_sf_m = read_data_file(sf_file)
+                            if df_sf_m is not None and all(c in df_sf_m.columns for c in ['Status Code', 'Meta Description 1']):
+                                df200_xlsx = df_sf_m[df_sf_m['Status Code'] == 200][['Address', 'Meta Description 1']].copy()
+                                empty_xl = df200_xlsx[df200_xlsx['Meta Description 1'].isna() | (df200_xlsx['Meta Description 1'].astype(str).str.strip() == '')]
+                                dupl_xl = df200_xlsx[df200_xlsx.duplicated(subset=['Meta Description 1'], keep=False) & df200_xlsx['Meta Description 1'].notna() & (df200_xlsx['Meta Description 1'].astype(str).str.strip() != '')]
+                                if not empty_xl.empty:
+                                    empty_xl.rename(columns={'Address': 'URL', 'Meta Description 1': 'Meta Description'}).to_excel(writer, sheet_name='MetaDesc_Puste', index=False)
+                                if not dupl_xl.empty:
+                                    dupl_xl.rename(columns={'Address': 'URL', 'Meta Description 1': 'Meta Description'}).sort_values('Meta Description').to_excel(writer, sheet_name='MetaDesc_Duplikaty', index=False)
+
+                        # Styling XLSX z kolorami brandowymi + auto-szerokosc + wyrodkowanie
+                        from openpyxl.styles import Alignment
                         header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
                         header_font = Font(color="FFFFFF", bold=True)
                         for sheetname in writer.sheets:
                             ws = writer.sheets[sheetname]
+                            # Naglowki
                             for cell in ws[1]:
                                 cell.fill = header_fill
                                 cell.font = header_font
+                                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                            # Dane + auto-szerokosc
+                            col_widths = {}
+                            url_like_cols = set()
+                            for i, cell in enumerate(ws[1], 1):
+                                col_name = str(cell.value or '')
+                                if any(u in col_name.lower() for u in ['address', 'url', 'redirect']):
+                                    url_like_cols.add(i)
+                                col_widths[i] = max(len(col_name), 10)
+                            for row in ws.iter_rows(min_row=2):
+                                for cell in row:
+                                    col_i = cell.column
+                                    val_len = len(str(cell.value or ''))
+                                    col_widths[col_i] = min(max(col_widths.get(col_i, 10), val_len + 2), 60)
+                                    if col_i in url_like_cols:
+                                        cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+                                    else:
+                                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                            for col_i, width in col_widths.items():
+                                ws.column_dimensions[get_column_letter(col_i)].width = width
 
                     # Final export
                     doc_io = io.BytesIO()
@@ -834,7 +944,8 @@ with tabs[5]:
                     _df_ahrefs = read_data_file(ahrefs_file) if ahrefs_file else None
                     _df_senuto = read_data_file(senuto_file) if senuto_file else None
                     _df_schema = read_data_file(schema_file) if schema_file else None
-                    st.session_state['ready_html'] = generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, _df_sf, _df_ahrefs, _df_senuto, _df_schema, client_name, analyzed_url)
+                    _df_js = read_data_file(js_file) if js_file else None
+                    st.session_state['ready_html'] = generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, _df_sf, _df_ahrefs, _df_senuto, _df_schema, _df_js, client_name, analyzed_url)
                     
                 except Exception as e:
                     st.error(f"Błąd podczas generowania: {e}")
