@@ -147,6 +147,98 @@ def read_data_file(file):
         except: return None
     return None
 
+def generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, df_sf, df_ahrefs, df_senuto, df_schema, client_name, analyzed_url):
+    html = f"""<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Raport AI Readiness - {client_name}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {{ --primary: #003366; --secondary: #006699; --tertiary: #FF9900; --light: #F5F7FA; --primary-light: #e6f0fa; --border-color: #ccd9e8; }}
+        body {{ font-family: 'Manrope', sans-serif; background-color: var(--light); color: #2d3436; padding: 40px 20px; line-height: 1.6; margin: 0; }}
+        .container {{ max-width: 900px; margin: 0 auto; background: white; padding: 60px; border-radius: 16px; border-top: 8px solid var(--primary); box-shadow: 0 15px 35px rgba(0,0,0,0.08); }}
+        h1, h2, h3 {{ font-family: 'Manrope', sans-serif; color: var(--primary); font-weight: 800; letter-spacing: -0.02em; margin-top: 1.5em; }}
+        h1 {{ font-size: 2.8rem; border-bottom: 2px solid var(--light); padding-bottom: 20px; margin-top: 0; }}
+        h2 {{ font-size: 1.8rem; border-left: 6px solid var(--tertiary); padding-left: 15px; color: var(--secondary); }}
+        h3 {{ font-size: 1.4rem; }}
+        table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin: 30px 0; font-size: 0.95rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }}
+        thead {{ background-color: var(--primary); color: white; }}
+        th {{ padding: 16px; text-align: left; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.05em; }}
+        td {{ padding: 14px 16px; border-bottom: 1px solid var(--border-color); vertical-align: top; }}
+        tr:nth-child(even) {{ background-color: var(--primary-light); }}
+        .commentary {{ background: var(--light); border-left: 6px solid var(--secondary); padding: 20px 30px; margin: 30px 0; font-style: italic; color: var(--primary); border-radius: 0 8px 8px 0; }}
+        .robots-code {{ background-color: #f0f0f0; color: #2d3436; padding: 20px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap; line-height: 1.1; }}
+        @media print {{ body {{ background: white; padding: 0; }} .container {{ box-shadow: none; padding: 0; border-top: none; }} button {{ display: none; }} }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align: right;"><button onclick="window.print()" style="background:var(--tertiary); color:white; border:none; padding:10px 20px; font-size:16px; border-radius:5px; cursor:pointer; font-weight: bold;">🖨️ Zapisz do PDF (Wydrukuj)</button></div>
+        <h1>Raport AI Readiness: {analyzed_url}</h1>
+        <p><strong>Klient:</strong> {client_name}</p>
+"""
+    def section(title, d):
+        s = f"<h2>{title}</h2>"
+        for q, a in d.items():
+            icon = "✅" if "tak" in str(a).lower() else "❌" if "nie" in str(a).lower() else "➡️"
+            if q == "Czy linki przychodzące kierują do stron 404?" and "tak" in str(a).lower(): icon = "❌"
+            s += f"<h3>{str(q).replace('(podaj link)', '').strip()}</h3>"
+            if str(a).startswith('http'): s += f"<p>{icon} <a href='{a}'>{a}</a></p>"
+            else: s += f"<p>{icon} {a}</p>"
+            if q in commentary_db: s += f"<div class='commentary'>{commentary_db[q]}</div>"
+        return s
+
+    html += section("1. Crawling i Indeksowanie", tech_answers)
+    if robots_text:
+        robots_clean = "\n".join([line for line in robots_text.replace('\r', '').split('\n') if line.strip()])
+        html += f"<h3>Zawartość pliku robots.txt:</h3><div class='robots-code'>{robots_clean}</div>"
+
+    html += section("2. Treści", content_answers)
+    html += section("3. Social Media", social_answers)
+    html += section("4. Linkbuilding", lb_answers)
+
+    def html_table(df, title):
+        if df is None or df.empty: return ""
+        return f"<h3>{title}</h3>\n" + df.to_html(index=False, border=0, classes="")
+
+    html += "<h2>5. Analiza potencjału w AI Overviews</h2>"
+    if df_ahrefs is not None and len(df_ahrefs.columns) > 1 and 'Current URL inside' in df_ahrefs.columns:
+        df_ai = df_ahrefs[df_ahrefs['Current URL inside'].astype(str).str.contains('AI Overview', case=False, na=False)].sort_values(by='Volume', ascending=False)
+        html += html_table(df_ai[['Keyword', 'Volume', 'Current position', 'Current URL']].rename(columns={'Keyword': 'Słowo kluczowe', 'Volume': 'Wolumen', 'Current position': 'Pozycja organiczna', 'Current URL': 'URL'}).head(10), "Widoczność AI Overview - Ahrefs")
+
+    if df_senuto is not None:
+        scols = ['Słowo kluczowe', 'Pozycja organiczna', 'Najlepsza pozycja w AIO', 'URL najlepszej pozycji w AIO']
+        avail = [c for c in scols if c in df_senuto.columns]
+        if avail:
+            html += html_table(df_senuto[avail].rename(columns={'URL najlepszej pozycji w AIO': 'URL w AIO'}).head(10), "Widocznosć AI Overview - Senuto")
+
+    if df_sf is not None or df_schema is not None:
+        html += "<h2>6. Analiza techniczna (Screaming Frog)</h2>"
+        if df_sf is not None:
+            if 'Indexability' in df_sf.columns:
+                html += html_table(df_sf[df_sf['Indexability'] == 'Non-Indexable'][['Address', 'Indexability Status', 'Status Code']], "Strony nieindeksowalne")
+            cwv_cols = ['Largest Contentful Paint Time (ms)', 'Cumulative Layout Shift', 'First Contentful Paint Time (ms)']
+            if all(c in df_sf.columns for c in cwv_cols):
+                html += "<h3>Core Web Vitals</h3>"
+                html += html_table(df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze strony (LCP)")
+                html += html_table(df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5), "Strony z najwyższym przesunięciem (CLS)")
+                html += html_table(df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).head(5), "Najwolniejsze ładowanie treści (FCP)")
+            
+            if 'Status Code' in df_sf.columns:
+                err4xx = df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)]
+                if not err4xx.empty: html += html_table(err4xx[['Address', 'Status Code']].head(10), f"Strony zwracające błąd 4xx ({len(err4xx)})")
+                err3xx = df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)]
+                if not err3xx.empty: html += html_table(err3xx[['Address', 'Redirect URL']].head(10), f"Strony z przekierowaniem 3xx ({len(err3xx)})")
+
+        if df_schema is not None and 'Indexability' in df_schema.columns and 'Address' in df_schema.columns:
+            df_s = df_schema[df_schema['Indexability'] == 'Indexable'].sort_values('Address', ascending=True)
+            t_cols = [c for c in df_s.columns if c.startswith('Type-')][:5]
+            html += html_table(df_s[['Address'] + t_cols].fillna('-').head(10), "Dane Strukturalne (Schema)")
+
+    html += "</div></body></html>"
+    return html
+
 def set_cell_shading(cell, fill_color):
     shading_elm = OxmlElement('w:shd')
     shading_elm.set(qn('w:val'), 'clear')
@@ -179,7 +271,7 @@ def add_strategic_commentary(document, key, commentary_db):
 st.title("🚀 AI Readiness Report Generator")
 st.markdown("Automatyczne narzędzie do audytu gotowości witryny na zmiany w ekosystemie AI (SGE/AIO).")
 
-tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "📄 Generuj Raport"])
+tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "🔗 Linkbuilding", "📄 Generuj Raport"])
 
 # --- TAB 1: Dane Podstawowe ---
 with tabs[0]:
@@ -217,10 +309,10 @@ with tabs[1]:
     tech_answers = {}
     cols = st.columns(2)
     for i, q in enumerate(tech_q):
-        ans = cols[i%2].selectbox(q, ["Tak", "Nie", "Do wdrożenia", "Nie dotyczy", "Własny komentarz"], key=f"tech_{i}", help=commentary_db.get(q))
-        if ans == "Własny komentarz":
+        ans = cols[i%2].selectbox(q, ["✅ Tak", "❌ Nie", "➡️ Do wdrożenia", "➡️ Nie dotyczy", "💬 Własny komentarz"], key=f"tech_{i}", help=commentary_db.get(q))
+        if ans == "💬 Własny komentarz":
             ans = cols[i%2].text_input("📝 Twój komentarz:", key=f"tech_custom_{i}")
-        tech_answers[q] = ans
+        tech_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
 
     st.divider()
     st.subheader("Pliki z narzędzi")
@@ -248,10 +340,10 @@ with tabs[2]:
     ]
     content_answers = {}
     for q in content_q:
-        ans = st.selectbox(q, ["Tak", "Nie", "Częściowo", "Własny komentarz"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
-        if ans == "Własny komentarz":
+        ans = st.selectbox(q, ["✅ Tak", "❌ Nie", "➡️ Częściowo", "💬 Własny komentarz"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
+        if ans == "💬 Własny komentarz":
             ans = st.text_input("📝 Twój komentarz:", key=f"cont_custom_{q}")
-        content_answers[q] = ans
+        content_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
 
     st.divider()
     st.subheader("Social Media")
@@ -270,13 +362,14 @@ with tabs[2]:
         if "podaj link" in q:
             social_answers[q] = st.text_input(q, key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
         else:
-            ans = st.selectbox(q, ["Tak", "Nie", "Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
-            if ans == "Własny komentarz":
+            ans = st.selectbox(q, ["✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
+            if ans == "💬 Własny komentarz":
                 ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}")
-            social_answers[q] = ans
+            social_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
 
-    st.divider()
-    st.subheader("Linkbuilding")
+# --- TAB 4: Linkbuilding ---
+with tabs[3]:
+    st.subheader("Audyt Profilu Linków")
     lb_q = [
         "Czy autorytet strony wyrażony DR rośnie lub jest stabilny?",
         "Czy stronie stale przybywa linków przychodzących?",
@@ -284,14 +377,14 @@ with tabs[2]:
     ]
     lb_answers = {}
     for q in lb_q:
-        ans = st.selectbox(q, ["Tak", "Nie", "Wymaga analizy", "Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
-        if ans == "Własny komentarz":
+        ans = st.selectbox(q, ["✅ Tak", "❌ Nie", "➡️ Wymaga analizy", "💬 Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+        if ans == "💬 Własny komentarz":
             ans = st.text_input("📝 Twój komentarz:", key=f"lb_custom_{q}")
-        lb_answers[q] = ans
+        lb_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
     lb_img = st.file_uploader("Screen z Ahrefs (Backlink profile):", type=['png', 'jpg', 'jpeg'])
 
-# --- TAB 4: Generuj Raport ---
-with tabs[3]:
+# --- TAB 5: Generuj Raport ---
+with tabs[4]:
     st.subheader("Finalizacja")
     if st.button("🚀 GENERUJ RAPORT (DOCX + XLSX)", type="primary"):
         if not analyzed_url:
@@ -314,6 +407,8 @@ with tabs[3]:
                             if schema_file is None: schema_file = MockFile("example/structured_data_all - oralb.xlsx")
                             if js_file is None: js_file = MockFile("example/javascript_all - oralb.xlsx")
                             if logo_file is None: logo_file = MockFile("example/logo-oralb.png")
+                            if robots_file is None: robots_file = MockFile("example/robots.txt")
+                            if lb_img is None: lb_img = MockFile("example/ahrefs-oralb.png")
                         except Exception as mock_err:
                             pass
 
@@ -387,7 +482,8 @@ with tabs[3]:
                                     p = table.cell(0,0).paragraphs[0]
                                     p.paragraph_format.space_after = Pt(0)
                                     p.paragraph_format.line_spacing = 1.0
-                                    run = p.add_run(robots_content)
+                                    robots_clean = "\n".join([line for line in robots_content.replace('\r', '').split('\n') if line.strip()])
+                                    run = p.add_run(robots_clean)
                                     run.font.name = 'Courier New'
                                     run.font.size = Pt(9)
                             else:
@@ -596,12 +692,19 @@ with tabs[3]:
                     st.session_state['ready_xlsx'] = xlsx_buffer.getvalue()
                     st.session_state['ready_client'] = client_name
                     
+                    # Generuj HTML
+                    _df_sf = read_data_file(sf_file) if sf_file else None
+                    _df_ahrefs = read_data_file(ahrefs_file) if ahrefs_file else None
+                    _df_senuto = read_data_file(senuto_file) if senuto_file else None
+                    _df_schema = read_data_file(schema_file) if schema_file else None
+                    st.session_state['ready_html'] = generate_html_report(tech_answers, content_answers, social_answers, lb_answers, commentary_db, robots_text, _df_sf, _df_ahrefs, _df_senuto, _df_schema, client_name, analyzed_url)
+                    
                 except Exception as e:
                     st.error(f"Błąd podczas generowania: {e}")
                     st.code(traceback.format_exc())
 
     if st.session_state.get('ready_docx') and st.session_state.get('ready_xlsx'):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         col1.download_button(
             label="📥 Pobierz Raport DOCX",
             data=st.session_state['ready_docx'],
@@ -614,6 +717,13 @@ with tabs[3]:
             file_name=f"Dane_AI_Readiness_{st.session_state.get('ready_client', 'Klient')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+        if st.session_state.get('ready_html'):
+            col3.download_button(
+                label="📥 Pobierz PDF/HTML",
+                data=st.session_state['ready_html'],
+                file_name=f"Raport_AI_Readiness_{st.session_state.get('ready_client', 'Klient')}.html",
+                mime="text/html"
+            )
 
 st.sidebar.markdown(f"""
 ### Status Projektu
@@ -626,7 +736,7 @@ else:
     st.sidebar.success("Projekt zainicjowany.")
 
 st.sidebar.divider()
-st.sidebar.subheader("💡 Przykładowe Narzędzie")
+st.sidebar.subheader("💡 Przykładowe dane")
 st.sidebar.markdown("Zobacz jak wygląda gotowy raport lub przetestuj narzędzie używając przykładowych danych.")
 
 def load_example_data():
@@ -635,7 +745,7 @@ def load_example_data():
     st.session_state["use_example_files"] = True
     # Tech
     for i in range(17):
-        st.session_state[f"tech_{i}"] = "Tak"
+        st.session_state[f"tech_{i}"] = "✅ Tak"
     # Content
     content_questions = [
         "Czy Twoje najważniejsze strony zostały zaktualizowane w ciągu ostatnich 6 miesięcy?",
@@ -645,7 +755,7 @@ def load_example_data():
         "Czy dodane są linki do źródeł naukowych, raportów branżowych albo źródeł pierwotnych?"
     ]
     for q in content_questions:
-        st.session_state[f"cont_{q}"] = "Tak"
+        st.session_state[f"cont_{q}"] = "✅ Tak"
     # Social Medias
     social_questions = [
         "Czy marka ma utworzony profil społecznościowy na Facebook? (podaj link)",
@@ -661,7 +771,7 @@ def load_example_data():
         if "podaj link" in q:
             st.session_state[f"soc_{q}"] = "https://facebook.com/oralb" if "Facebook" in q else "https://instagram.com/oralb"
         else:
-            st.session_state[f"soc_{q}"] = "Tak"
+            st.session_state[f"soc_{q}"] = "✅ Tak"
     # Linkbuilding
     lb_questions = [
         "Czy autorytet strony wyrażony DR rośnie lub jest stabilny?",
@@ -669,15 +779,15 @@ def load_example_data():
         "Czy linki przychodzące kierują do stron 404?"
     ]
     for q in lb_questions:
-        st.session_state[f"lb_{q}"] = "Tak"
-if st.sidebar.button("✨ Uzupełnij formularz", on_click=load_example_data):
+        st.session_state[f"lb_{q}"] = "✅ Tak"
+if st.sidebar.button("✨ Uzupełnij przykładowe dane w formularzu", on_click=load_example_data):
     st.sidebar.success("Formularz wypełniony danymi Oral-B!")
 
 try:
     with open("example/Raport_AI_Readiness_Ekspercki (19).docx", "rb") as f:
         docx_bytes = f.read()
     st.sidebar.download_button(
-        label="📄 Pobierz wzór Raportu (DOCX)",
+        label="📄 Pobierz przykładowy raport",
         data=docx_bytes,
         file_name="Przykladowy_Raport_AI_Readiness_OralB.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
