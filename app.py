@@ -162,19 +162,26 @@ def generate_html_report(tech_answers, content_answers, social_answers, lb_answe
         h1 {{ font-size: 2.8rem; border-bottom: 2px solid var(--light); padding-bottom: 20px; margin-top: 0; }}
         h2 {{ font-size: 1.8rem; border-left: 6px solid var(--tertiary); padding-left: 15px; color: var(--secondary); }}
         h3 {{ font-size: 1.4rem; }}
-        table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin: 30px 0; font-size: 0.95rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }}
+        table {{ width: 100%; border-collapse: separate; border-spacing: 0; margin: 30px 0; font-size: 0.88rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); table-layout: fixed; word-wrap: break-word; }}
         thead {{ background-color: var(--primary); color: white; }}
-        th {{ padding: 16px; text-align: left; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.05em; }}
-        td {{ padding: 14px 16px; border-bottom: 1px solid var(--border-color); vertical-align: top; }}
+        th {{ padding: 12px 10px; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; word-break: break-word; }}
+        td {{ padding: 10px; border-bottom: 1px solid var(--border-color); vertical-align: top; overflow-wrap: break-word; word-break: break-all; max-width: 300px; }}
         tr:nth-child(even) {{ background-color: var(--primary-light); }}
         .commentary {{ background: var(--light); border-left: 6px solid var(--secondary); padding: 20px 30px; margin: 30px 0; font-style: italic; color: var(--primary); border-radius: 0 8px 8px 0; }}
         .robots-code {{ background-color: #f0f0f0; color: #2d3436; padding: 20px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap; line-height: 1.1; }}
-        @media print {{ body {{ background: white; padding: 0; }} .container {{ box-shadow: none; padding: 0; border-top: none; }} button {{ display: none; }} }}
+        @media print {{
+            @page {{ margin: 1.5cm; size: A4; }}
+            body {{ background: white; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+            .container {{ box-shadow: none; padding: 20px; border-top: none; }}
+            button {{ display: none !important; }}
+        }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div style="text-align: right;"><button onclick="window.print()" style="background:var(--tertiary); color:white; border:none; padding:10px 20px; font-size:16px; border-radius:5px; cursor:pointer; font-weight: bold;">🖨️ Zapisz do PDF (Wydrukuj)</button></div>
+        <div style="text-align: right; margin-bottom: 20px;">
+            <button onclick="document.title=''; window.print();" style="background:var(--tertiary); color:white; border:none; padding:10px 20px; font-size:16px; border-radius:5px; cursor:pointer; font-weight: bold;">🖨️ Zapisz do PDF (Wydrukuj)</button>
+        </div>
         <h1>Raport AI Readiness: {analyzed_url}</h1>
         <p><strong>Klient:</strong> {client_name}</p>
 """
@@ -271,7 +278,7 @@ def add_strategic_commentary(document, key, commentary_db):
 st.title("🚀 AI Readiness Report Generator")
 st.markdown("Automatyczne narzędzie do audytu gotowości witryny na zmiany w ekosystemie AI (SGE/AIO).")
 
-tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "🔗 Linkbuilding", "📄 Generuj Raport"])
+tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści i Social", "🔗 Linkbuilding", "🧠 Analiza Semantyczna", "📄 Generuj Raport"])
 
 # --- TAB 1: Dane Podstawowe ---
 with tabs[0]:
@@ -309,10 +316,11 @@ with tabs[1]:
     tech_answers = {}
     cols = st.columns(2)
     for i, q in enumerate(tech_q):
-        ans = cols[i%2].selectbox(q, ["✅ Tak", "❌ Nie", "➡️ Do wdrożenia", "➡️ Nie dotyczy", "💬 Własny komentarz"], key=f"tech_{i}", help=commentary_db.get(q))
+        ans = cols[i%2].selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "➡️ Do wdrożenia", "➡️ Nie dotyczy", "💬 Własny komentarz"], key=f"tech_{i}", help=commentary_db.get(q))
         if ans == "💬 Własny komentarz":
             ans = cols[i%2].text_input("📝 Twój komentarz:", key=f"tech_custom_{i}")
-        tech_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
+        clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
+        tech_answers[q] = clean
 
     st.divider()
     st.subheader("Pliki z narzędzi")
@@ -340,10 +348,11 @@ with tabs[2]:
     ]
     content_answers = {}
     for q in content_q:
-        ans = st.selectbox(q, ["✅ Tak", "❌ Nie", "➡️ Częściowo", "💬 Własny komentarz"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
+        ans = st.selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "➡️ Częściowo", "💬 Własny komentarz"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
         if ans == "💬 Własny komentarz":
             ans = st.text_input("📝 Twój komentarz:", key=f"cont_custom_{q}")
-        content_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
+        clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
+        content_answers[q] = clean
 
     st.divider()
     st.subheader("Social Media")
@@ -362,10 +371,11 @@ with tabs[2]:
         if "podaj link" in q:
             social_answers[q] = st.text_input(q, key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
         else:
-            ans = st.selectbox(q, ["✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
+            ans = st.selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "💬 Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
             if ans == "💬 Własny komentarz":
                 ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}")
-            social_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
+            clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
+            social_answers[q] = clean
 
 # --- TAB 4: Linkbuilding ---
 with tabs[3]:
@@ -377,14 +387,112 @@ with tabs[3]:
     ]
     lb_answers = {}
     for q in lb_q:
-        ans = st.selectbox(q, ["✅ Tak", "❌ Nie", "➡️ Wymaga analizy", "💬 Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+        ans = st.selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "➡️ Wymaga analizy", "💬 Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
         if ans == "💬 Własny komentarz":
             ans = st.text_input("📝 Twój komentarz:", key=f"lb_custom_{q}")
-        lb_answers[q] = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "") if isinstance(ans, str) else ans
+        clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
+        lb_answers[q] = clean
     lb_img = st.file_uploader("Screen z Ahrefs (Backlink profile):", type=['png', 'jpg', 'jpeg'])
 
-# --- TAB 5: Generuj Raport ---
+# --- TAB 5: Analiza Semantyczna ---
 with tabs[4]:
+    st.subheader("🧠 Analiza Semantyczna Pojedynczego Wpisu")
+    st.markdown("""Ta zakładka opisuje **dodatkową, płatną usługę audytu Content Intelligence** — pogłębioną analizę pojedynczego artykułu pod kątem algorytmów Google i modeli AI takich jak ChatGPT czy Google AI Overviews.
+    
+> 💡 Zainteresowany? Skontaktuj się z nami, aby otrzymać wycenę analizy dla swoich kluczowych treści.""", unsafe_allow_html=False)
+    st.divider()
+
+    with st.expander("🎯 Wstęp: Jak Google i AI czytają Twoje treści?", expanded=True):
+        st.markdown("""
+**Celem tego audytu** nie jest tylko sprawdzenie, czy tekst "dobrze się czyta" ludziom. Naszym głównym zadaniem jest dostosowanie treści do sposobu, w jaki analizują ją **algorytmy Google oraz nowoczesne modele AI** (takie jak ChatGPT czy Google AI Overviews).
+
+Audyt składa się z **3 głównych filarów**, które sprawdzają treść pod kątem co najmniej 12 kluczowych kryteriów:
+
+1. **Zgodność z Central Search Intent (CSI)** – czy algorytm rozumie, o czym dokładnie piszesz i dla kogo?
+2. **Jakość treści** – jak kosztowna i trudna w interpretacji jest Twoja strona dla robota?
+3. **Ocena E-E-A-T** – czy Google uważa Cię za wiarygodnego eksperta?
+""")
+        try:
+            with open("example/Przykladowa-analiza-semantyczna-tresci.html", "rb") as fh:
+                st.download_button("📄 Pobierz przykład gotowej analizy semantycznej", data=fh.read(), file_name="Przykladowa-analiza-semantyczna.html", mime="text/html")
+        except: pass
+
+    with st.expander("🔍 Filar 1: Zgodność z Central Search Intent (CSI)"):
+        st.markdown("""
+*(Analiza: EAV GAP + BLUF + Chunk + URR)*
+
+Tutaj sprawdzamy, czy Twój artykuł odpowiada na intencję użytkownika i czy jest zbudowany tak, aby maszyna mogła bezbłędnie zidentyfikować temat przewodni.
+
+#### Central Search Intent (CSI)
+To matematyczne połączenie tematu (Encji) z kontekstem źródła. Algorytm musi wiedzieć, z jakiej perspektywy opisujesz temat.
+
+> **PRZYKŁAD:**
+> - *Encja Centralna:* Szczoteczka soniczna [Marka X].
+> - *Source Context:* Blog stomatologiczny vs Sklep RTV/AGD.
+> - Dla bloga: "Jak poprawnie myć zęby tym modelem? Instruktaż".
+> - Dla sklepu: "Porównanie ceny, specyfikacja techniczna, zakup".
+
+#### Entity-Attribute-Value (EAV)
+Google dąży do wyekstrahowania z tekstu "suchych faktów". Model EAV pozwala maszynom porównywać dane:
+- **Entity:** Główny obiekt (np. Szczoteczka soniczna).
+- **Attribute:** Cecha encji (np. częstotliwość drgań).
+- **Value:** Konkretna dana (np. 62 000 ruchów na minutę).
+
+#### BLUF (Bottom Line Up Front)
+Najważniejsza informacja musi znaleźć się na początku. Google i AI często skanują tylko pierwsze 50 słów sekcji szukając fragmentu do zacytowania.
+
+#### CHUNK (Fragmentacja pod RAG)
+RAG (Retrieval-Augmented Generation) to technologia, dzięki której AI "uczy się" z Twojej strony. Każda sekcja pod H2 powinna być **samodzielną, wyczerpującą odpowiedzią** na dany problem.
+
+#### URR (Unique, Root, Rare)
+Hierarchia atrybutów encji:
+- **UNIQUE:** Cecha wyróżniająca obiekt od wszystkich innych.
+- **ROOT:** Atrybuty określające czym obiekt jest u podstaw.
+- **RARE:** Detale dla ekspertów, "nice to have".
+""")
+
+    with st.expander("📊 Filar 2: Jakość treści"):
+        st.markdown("""
+*(Analiza: CoR + Information Density + SRL + TF-IDF)*
+
+#### CoR (Cost of Retrieval – Koszt Wydobycia)
+To wydatek obliczeniowy, jaki wyszukiwarka ponosi na przeczytanie Twojej strony.
+**Zasada:** Google wybierze konkurencję, która dostarczy tę samą wiedzę "taniej" (prostszy kod, szybszy serwer, zwięzła struktura zdań).
+
+#### Information Density (Gęstość Informacji)
+Stosunek konkretnych faktów do "puchu" (ang. fluff):
+- ❌ *Niska gęstość:* "Szczotkowanie zębów jest bardzo ważną czynnością, którą każdy z nas powinien wykonywać codziennie..." (Dużo słów, zero wiedzy).
+- ✅ *Wysoka gęstość:* "Szczotkowanie zębów 2× dziennie przez 2 minuty usuwa płytkę nazębną i zapobiega próchnicy." (Liczby, skutki, procesy).
+
+#### SRL (Semantic Role Labeling)
+Gramatyka dla robotów. Wskazuje: **Kto? Co robi? Komu?**
+- ❌ *Niejasne:* "Zostało potwierdzone, że usuwanie osadu jest skuteczniejsze."
+- ✅ *SRL Optimized:* "Szczoteczka soniczna usuwa płytkę nazębną o 74% skuteczniej niż szczoteczka manualna."
+
+#### TF-IDF (Trafność terminologiczna)
+Wskaźnik oceniający unikalność słownictwa:
+- **TF (Term Frequency):** Ile razy słowo występuje u Ciebie.
+- **IDF (Inverse Document Frequency):** Jak rzadkie/specjalistyczne jest to słowo w internecie.
+
+Fachowa terminologia ("strefy retencji", "abrazja") daje silny sygnał ekspertyzy.
+""")
+
+    with st.expander("⭐ Filar 3: Ocena E-E-A-T"):
+        st.markdown("""
+*(Experience, Expertise, Authoritativeness, Trustworthiness)*
+
+System, którym Google ocenia wiarygodność Twoją i Twojej strony. W branżach YMYL (Twoje Pieniądze lub Twoje Życie) jest to kryterium krytyczne.
+
+| Wymiar | Co sprawdzamy? |
+|--------|----------------|
+| **Experience** | Czy autor faktycznie *używał* opisywanego produktu? Zdjęcia własne, opis odczuć, unikalne spostrzeżenia — vs przepisana specyfikacja producenta. |
+| **Expertise** | Czy autor ma wiedzę formalną? Czy artykuł o leczeniu napisał specjalista czy anonimowy copywriter? |
+| **Authoritativeness** | Czy inni eksperci cytują tę stronę? Czy jest ona liderem opinii w branży? |
+| **Trust** | Czy strona jest bezpieczna? Dane zgodne z prawdą? Intencja: pomoc użytkownikowi czy agresywna sprzedaż? |
+""")
+
+# --- TAB 6: Generuj Raport ---
+with tabs[5]:
     st.subheader("Finalizacja")
     if st.button("🚀 GENERUJ RAPORT (DOCX + XLSX)", type="primary"):
         if not analyzed_url:
@@ -467,6 +575,9 @@ with tabs[4]:
                             document.add_heading(short_title, level=2)
                             status_text = str(status).lower()
                             icon = "✅" if "tak" in status_text else "❌" if "nie" in status_text or not status_text else "➡️"
+                            # Pytanie o 404 - gdy TAK to ŹLE, więc ❌
+                            if question == "Czy linki przychodzące kierują do stron 404?" and "tak" in status_text:
+                                icon = "❌"
                             p = document.add_paragraph()
                             if str(status).startswith('http'):
                                 p.add_run(f'{icon} '); add_hyperlink(p, status, status)
@@ -607,6 +718,19 @@ with tabs[4]:
                                     add_strategic_commentary(doc, '3xx_redirects', commentary_db)
                                     add_styled_table(doc, err3xx[['Address', 'Redirect URL']].head(10), f"Strony z przekierowaniem 3xx ({len(err3xx)})")
 
+                    # Zaleznosc od JS (DOCX)
+                    if js_file:
+                        df_js = read_data_file(js_file)
+                        if df_js is not None:
+                            js_cols_docx = [c for c in ['Address', 'HTML Word Count', 'Rendered HTML Word Count', 'Word Count Change', 'JS Word Count %'] if c in df_js.columns]
+                            if js_cols_docx:
+                                doc.add_heading('7.5. Zale\u017cno\u015b\u0107 od JavaScript', level=2)
+                                add_strategic_commentary(doc, 'js_content', commentary_db)
+                                df_js_docx = df_js[js_cols_docx]
+                                if 'JS Word Count %' in df_js_docx.columns:
+                                    df_js_docx = df_js_docx.sort_values(by='JS Word Count %', ascending=False)
+                                add_styled_table(doc, df_js_docx.head(10), "Top 10 stron z najwy\u017csz\u0105 zale\u017cno\u015bci\u0105 od JS")
+
                     if schema_file:
                         df_schema = read_data_file(schema_file)
                         if df_schema is not None:
@@ -628,11 +752,12 @@ with tabs[4]:
                         all_summary = {**tech_answers, **content_answers, **social_answers, **lb_answers}
                         pd.DataFrame(list(all_summary.items()), columns=['Pytanie', 'Odpowiedź']).to_excel(writer, sheet_name='Checklista', index=False)
                         
-                        # 2. Ahrefs
+                        # 2. Ahrefs — tylko wybrane kolumny
                         if ahrefs_file:
                             df_ahrefs = read_data_file(ahrefs_file)
                             if df_ahrefs is not None:
-                                df_ahrefs.to_excel(writer, sheet_name='Ahrefs_AI_Overview_Full', index=False)
+                                ahrefs_keep = [c for c in ['Keyword', 'Volume', 'Current position', 'Current URL', 'Current URL inside'] if c in df_ahrefs.columns]
+                                df_ahrefs[ahrefs_keep].to_excel(writer, sheet_name='Ahrefs_AI_Overview_Full', index=False)
                         
                         # 3. Senuto
                         if senuto_file:
@@ -644,13 +769,17 @@ with tabs[4]:
                         if sf_file:
                             df_sf = read_data_file(sf_file)
                             if df_sf is not None:
-                                # Nieindeksowalne
+                                # Nieindeksowalne — 4 kolumny
                                 if 'Indexability' in df_sf.columns:
-                                    df_sf[df_sf['Indexability'] == 'Non-Indexable'].to_excel(writer, sheet_name='Nieindeksowalne', index=False)
-                                # 4xx i 3xx
+                                    ni_cols = [c for c in ['Address', 'Status Code', 'Indexability', 'Canonical Link Element 1'] if c in df_sf.columns]
+                                    df_sf[df_sf['Indexability'] == 'Non-Indexable'][ni_cols].to_excel(writer, sheet_name='Nieindeksowalne', index=False)
+                                # 4xx — 2 kolumny
                                 if 'Status Code' in df_sf.columns:
-                                    df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)].to_excel(writer, sheet_name='Bledy_4xx', index=False)
-                                    df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)].to_excel(writer, sheet_name='Przekierowania_3xx', index=False)
+                                    err4_cols = [c for c in ['Address', 'Status Code'] if c in df_sf.columns]
+                                    df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)][err4_cols].to_excel(writer, sheet_name='Bledy_4xx', index=False)
+                                    # 3xx — 3 kolumny
+                                    err3_cols = [c for c in ['Address', 'Status Code', 'Redirect URL'] if c in df_sf.columns]
+                                    df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)][err3_cols].to_excel(writer, sheet_name='Przekierowania_3xx', index=False)
                                 # CWV
                                 if 'Largest Contentful Paint Time (ms)' in df_sf.columns:
                                     df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_LCP', index=False)
@@ -659,17 +788,25 @@ with tabs[4]:
                                 if 'First Contentful Paint Time (ms)' in df_sf.columns:
                                     df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_FCP', index=False)
                         
-                        # 5. JS Analysis
+                        # 5. JS Analysis — 5 kolumn, posortowane wg JS Word Count %
                         if js_file:
                             df_js = read_data_file(js_file)
                             if df_js is not None:
-                                df_js.to_excel(writer, sheet_name='Zaleznosc_od_JS', index=False)
+                                js_cols = [c for c in ['Address', 'HTML Word Count', 'Rendered HTML Word Count', 'Word Count Change', 'JS Word Count %'] if c in df_js.columns]
+                                df_js_out = df_js[js_cols]
+                                if 'JS Word Count %' in df_js_out.columns:
+                                    df_js_out = df_js_out.sort_values(by='JS Word Count %', ascending=False)
+                                df_js_out.to_excel(writer, sheet_name='Zaleznosc_od_JS', index=False)
                                 
-                        # 6. Schema
+                        # 6. Schema — posortowane: Indexable pierwsze
                         if schema_file:
                             df_schema = read_data_file(schema_file)
                             if df_schema is not None:
-                                df_schema.to_excel(writer, sheet_name='Implementacja_Schema', index=False)
+                                if 'Indexability' in df_schema.columns:
+                                    df_schema_sorted = df_schema.sort_values('Indexability', ascending=True)  # Indexable < Non-Indexable alfabetycznie
+                                    df_schema_sorted.to_excel(writer, sheet_name='Implementacja_Schema', index=False)
+                                else:
+                                    df_schema.to_excel(writer, sheet_name='Implementacja_Schema', index=False)
 
                         # Styling XLSX z kolorami brandowymi
                         header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
@@ -704,6 +841,15 @@ with tabs[4]:
                     st.code(traceback.format_exc())
 
     if st.session_state.get('ready_docx') and st.session_state.get('ready_xlsx'):
+        st.info("""
+**ℹ️ Przed wysłaniem raportów do klienta — przeczytaj to!**
+
+Wygenerowane pliki są gotowe w ~90%. Zalecamy ostateczne przejrzenie i drobne poprawki wizualne, ponieważ automatyczny generator może sporadycznie nieprawidłowo sformatować wybrane sekcje.
+
+- 📝 **Plik DOCX** — sprawdź formatowanie tabel, odstępy między sekcjami oraz poprawność wstawionych zdjęć (loga, screeny).
+- 🌐 **Plik HTML/PDF** — otwórz w przeglądarce i użyj `Ctrl+P` → "Zapisz jako PDF". Sprawdź czy żadna tabela nie wychodzi poza krawędź strony.
+- 📊 **Plik XLSX** — zawiera pełne dane techniczne. Możesz dołączyć go jako osobny załącznik do raportu.
+        """)
         col1, col2, col3 = st.columns(3)
         col1.download_button(
             label="📥 Pobierz Raport DOCX",
@@ -781,28 +927,28 @@ def load_example_data():
     for q in lb_questions:
         st.session_state[f"lb_{q}"] = "✅ Tak"
 if st.sidebar.button("✨ Uzupełnij przykładowe dane w formularzu", on_click=load_example_data):
-    st.sidebar.success("Formularz wypełniony danymi Oral-B!")
+    st.sidebar.success("Formularz wypełniony przykładowymi danymi")
 
 try:
     with open("example/Raport_AI_Readiness_Ekspercki (19).docx", "rb") as f:
         docx_bytes = f.read()
     st.sidebar.download_button(
-        label="📄 Pobierz przykładowy raport",
+        label="📄 Pobierz przykładowy raport (DOCX)",
         data=docx_bytes,
         file_name="Przykladowy_Raport_AI_Readiness_OralB.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
-except Exception as e:
-    st.sidebar.error(f"Brak pliku przykładowego DOCX w /example")
+except:
+    pass
 
 try:
     with open("example/Analiza_Techniczna_Wyniki (18).xlsx", "rb") as f:
         xlsx_bytes = f.read()
     st.sidebar.download_button(
-        label="📊 Pobierz wzór Danych (XLSX)",
+        label="📊 Pobierz przykładowy raport (XLSX)",
         data=xlsx_bytes,
         file_name="Przykladowa_Analiza_Techniczna_OralB.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-except Exception as e:
-    st.sidebar.error(f"Brak pliku przykładowego XLSX w /example")
+except:
+    pass
