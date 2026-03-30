@@ -312,6 +312,7 @@ with tabs[3]:
                             if ahrefs_file is None: ahrefs_file = MockFile("example/oralb.pl-organic-keywords-subdomains-pl--a_2026-02-16_21-13-42.csv")
                             if senuto_file is None: senuto_file = MockFile("example/analiza_widoczno_ci_raport_s_owa_kluczowe_ai_overviews___domain___2026_02_16_21_14.xlsx")
                             if schema_file is None: schema_file = MockFile("example/structured_data_all - oralb.xlsx")
+                            if js_file is None: js_file = MockFile("example/javascript_all - oralb.xlsx")
                             if logo_file is None: logo_file = MockFile("example/logo-oralb.png")
                         except Exception as mock_err:
                             pass
@@ -383,8 +384,12 @@ with tabs[3]:
                                     p_robots = document.add_paragraph(); p_robots.add_run("Zawartość pliku robots.txt:").bold = True
                                     table = document.add_table(rows=1, cols=1)
                                     set_cell_shading(table.cell(0,0), "F0F0F0")
-                                    run = table.cell(0,0).paragraphs[0].add_run(robots_content)
+                                    p = table.cell(0,0).paragraphs[0]
+                                    p.paragraph_format.space_after = Pt(0)
+                                    p.paragraph_format.line_spacing = 1.0
+                                    run = p.add_run(robots_content)
                                     run.font.name = 'Courier New'
+                                    run.font.size = Pt(9)
                             else:
                                 add_strategic_commentary(document, question, commentary_db)
 
@@ -448,19 +453,21 @@ with tabs[3]:
                     if ahrefs_file:
                         df_ahrefs = read_data_file(ahrefs_file)
                         if df_ahrefs is not None:
-                            doc.add_heading('6.1. Zasięgi globalne (Ahrefs)', level=2)
+                            doc.add_heading('6.1. Widoczność AI Overview - Ahrefs', level=2)
                             if len(df_ahrefs.columns) > 1 and 'Current URL inside' in df_ahrefs.columns:
-                                df_ahrefs_ai = df_ahrefs[df_ahrefs['Current URL inside'].astype(str).str.contains('AI Overview', case=False, na=False)].sort_values(by='Organic traffic', ascending=False)
-                                add_styled_table(doc, df_ahrefs_ai.head(10), "Top 10 fraz z AI Overview")
+                                df_ahrefs_ai = df_ahrefs[df_ahrefs['Current URL inside'].astype(str).str.contains('AI Overview', case=False, na=False)].sort_values(by='Volume', ascending=False)
+                                ahrefs_disp = df_ahrefs_ai[['Keyword', 'Volume', 'Current position', 'Current URL']].rename(columns={'Keyword': 'Słowo kluczowe', 'Volume': 'Wolumen', 'Current position': 'Pozycja organiczna', 'Current URL': 'URL'})
+                                add_styled_table(doc, ahrefs_disp.head(10), "")
                     
                     if senuto_file:
                         df_senuto = read_data_file(senuto_file)
                         if df_senuto is not None:
-                            doc.add_heading('6.2. Widoczność lokalna (Senuto)', level=2)
+                            doc.add_heading('6.2. Widocznosć AI Overview - Senuto', level=2)
                             senuto_cols = ['Słowo kluczowe', 'Pozycja organiczna', 'Najlepsza pozycja w AIO', 'URL najlepszej pozycji w AIO']
                             available_senuto = [c for c in senuto_cols if c in df_senuto.columns]
                             if available_senuto:
-                                add_styled_table(doc, df_senuto[available_senuto].head(10), "Top 10 fraz w AI Overviews (Senuto)")
+                                senuto_disp = df_senuto[available_senuto].rename(columns={'URL najlepszej pozycji w AIO': 'URL w AIO'})
+                                add_styled_table(doc, senuto_disp.head(10), "")
 
                     # Screaming Frog Data
                     if sf_file:
@@ -514,28 +521,59 @@ with tabs[3]:
                                 df_s = df_schema[df_schema['Indexability'] == 'Indexable'].sort_values('Address', ascending=True)
                                 type_cols = [c for c in df_s.columns if c.startswith('Type-')][:5]
                                 cols_to_show = ['Address'] + type_cols
-                                add_styled_table(doc, df_s[cols_to_show].head(10), "Znalezione elementy Schema (Top 10)")
+                                schema_disp = df_s[cols_to_show].fillna('-')
+                                add_styled_table(doc, schema_disp.head(10), "Znalezione elementy Schema (Top 10)")
                                 doc.add_paragraph("Pełne błędy, ostrzeżenia i wszystkie wykryte typy schema dla wszystkich adresów znajdują się w dołączonym arkuszu XLSX.")
 
                     # 3. XLSX Generation
                     xlsx_buffer = io.BytesIO()
                     with pd.ExcelWriter(xlsx_buffer, engine='openpyxl') as writer:
-                        # Summary Sheet
+                        # 1. Summary Sheet
                         all_summary = {**tech_answers, **content_answers, **social_answers, **lb_answers}
-                        pd.DataFrame(list(all_summary.items()), columns=['Pytanie', 'Odpowiedź']).to_excel(writer, sheet_name='Podsumowanie', index=False)
+                        pd.DataFrame(list(all_summary.items()), columns=['Pytanie', 'Odpowiedź']).to_excel(writer, sheet_name='Checklista', index=False)
                         
-                        if sf_file:
-                            df_sf = read_data_file(sf_file)
-                            if df_sf is not None:
-                                df_sf.head(100).to_excel(writer, sheet_name='Audyt Screaming Frog', index=False)
+                        # 2. Ahrefs
                         if ahrefs_file:
                             df_ahrefs = read_data_file(ahrefs_file)
                             if df_ahrefs is not None:
-                                df_ahrefs.to_excel(writer, sheet_name='Ahrefs AIO', index=False)
+                                df_ahrefs.to_excel(writer, sheet_name='Ahrefs_AI_Overview_Full', index=False)
+                        
+                        # 3. Senuto
                         if senuto_file:
                             df_senuto = read_data_file(senuto_file)
                             if df_senuto is not None:
-                                df_senuto.to_excel(writer, sheet_name='Senuto AIO', index=False)
+                                df_senuto.to_excel(writer, sheet_name='Senuto_AI_Overview_Full', index=False)
+                                
+                        # 4. Screaming Frog Data Breakdown
+                        if sf_file:
+                            df_sf = read_data_file(sf_file)
+                            if df_sf is not None:
+                                # Nieindeksowalne
+                                if 'Indexability' in df_sf.columns:
+                                    df_sf[df_sf['Indexability'] == 'Non-Indexable'].to_excel(writer, sheet_name='Nieindeksowalne', index=False)
+                                # 4xx i 3xx
+                                if 'Status Code' in df_sf.columns:
+                                    df_sf[(df_sf['Status Code'] >= 400) & (df_sf['Status Code'] < 500)].to_excel(writer, sheet_name='Bledy_4xx', index=False)
+                                    df_sf[(df_sf['Status Code'] >= 300) & (df_sf['Status Code'] < 400)].to_excel(writer, sheet_name='Przekierowania_3xx', index=False)
+                                # CWV
+                                if 'Largest Contentful Paint Time (ms)' in df_sf.columns:
+                                    df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_LCP', index=False)
+                                if 'Cumulative Layout Shift' in df_sf.columns:
+                                    df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).to_excel(writer, sheet_name='CWV_CLS', index=False)
+                                if 'First Contentful Paint Time (ms)' in df_sf.columns:
+                                    df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).to_excel(writer, sheet_name='CWV_FCP', index=False)
+                        
+                        # 5. JS Analysis
+                        if js_file:
+                            df_js = read_data_file(js_file)
+                            if df_js is not None:
+                                df_js.to_excel(writer, sheet_name='Zaleznosc_od_JS', index=False)
+                                
+                        # 6. Schema
+                        if schema_file:
+                            df_schema = read_data_file(schema_file)
+                            if df_schema is not None:
+                                df_schema.to_excel(writer, sheet_name='Implementacja_Schema', index=False)
 
                         # Styling XLSX z kolorami brandowymi
                         header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
