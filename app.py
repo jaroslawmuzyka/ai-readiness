@@ -392,26 +392,68 @@ tabs = st.tabs(["📌 Instrukcja", "📁 Dane Podstawowe", "🔧 Audyt Techniczn
 with tabs[0]:
     st.subheader("📌 Instrukcja korzystania z narzędzia")
     st.markdown("""
-    Aby wygenerować kompletny raport, przygotuj następujące pliki z narzędzi:
+Wszystkie pola w formularzu są opcjonalne. Jeśli czegoś nie chcesz umieszczać w raporcie AI Readiness to nie musisz uzupełniać konkretnego pola. Im więcej pól uzupełnisz tym większą wartość przekażemy dla klienta :)
+    """)
+    st.divider()
+    st.markdown("### Punkty 1-3 możesz uzupełnić ręcznie lub skorzystać z gotowego CONFIGU do Screaming Frog")
+    
+    try:
+        with open("Config AI Readiness.seospiderconfig", "rb") as f:
+            config_bytes = f.read()
+        st.download_button(
+            label="📥 Kliknij aby pobrać plik konfiguracyjny",
+            data=config_bytes,
+            file_name="Config_AI_Readiness.seospiderconfig",
+            mime="application/octet-stream"
+        )
+    except Exception as e:
+        st.error(f"Nie udało się załadować pliku konfiguracji: {e}")
 
-    1. **Screaming Frog (Główny audyt)**:
-        - Uruchom Spidera na domenie.
-        - Wyeksportuj listę adresów: `Internal` -> `HTML` (kliknij Export).
-        - To jest główny plik wrzucany w pole "Plik z audytem Screaming Frog".
+    st.info("Plik konfiguracyjny wgrasz przez Configuration -> Profiles (na samym dole) -> Load")
+    st.divider()
 
-    2. **Screaming Frog (JavaScript Analysis)**:
-        - Włącz `Configuration` -> `Spider` -> `Extraction` -> `JavaScript Content Analysis`.
-        - Przejdź do zakładki `Content` i wyeksportuj `JavaScript Content Analysis`.
-        - Plik wrzuć w pole "SF (JS Content Analysis)".
+    st.markdown("""
+**1. Włącz renderowanie JavaScript**
+Configuration -> Spider -> Rendering -> JavaScript
 
-    3. **Screaming Frog (Structured Data)**:
-        - Włącz `Configuration` -> `Spider` -> `Extraction` -> `Structured Data`.
-        - Eksportuj zakładkę `Structured Data` -> `All Structured Data`.
-        - Plik wrzuć w pole "SF (Structured Data)".
+**2. Włącz pobieranie informacji o Schema**
+Configuration -> Spider -> Extraction -> na dole jest pole "Structured Data" - zaznacz wszystko poza "Case-Sensitive"
 
-    4. **Ahrefs / Senuto**:
-        - Wyeksportuj raporty słów kluczowych, które wyzwalają funkcję "AI Overview".
-    """, unsafe_allow_html=False)
+**3. Włącz sprawdzanie duplikatów w treści**
+Configuration -> Content -> Duplicates -> zaznacz Enable Near Duplicates -> wpisz 90 (%)
+
+**4. Włącz API PageSpeed Insights**
+Configuration -> API Access -> PageSpeed Insights -> Source oznacz jako "Remote" i wklej klucz API (jeśli nie masz swojego, odezwij się do Jarosław Muzyka)
+
+**5. Wklej adres do Screaming Frog, rozpocznij crawl i poczekaj aż zostanie ukończony na 100% (zarówno crawl jak i pobieranie danych przez API).**
+
+Będziesz potrzebować danych z zakładek:
+
+**Internal -> Oznacz filtr po lewej stronie "HTML"**
+    """)
+    if os.path.exists("internal-html.png"):
+        st.image("internal-html.png", caption="Screaming Frog: Internal -> HTML")
+    
+    st.markdown("**JavaScript**")
+    if os.path.exists("javascript.png"):
+        st.image("javascript.png", caption="Screaming Frog: JavaScript Content Analysis")
+
+    st.markdown("**Structured Data**")
+    if os.path.exists("structured-data.png"):
+        st.image("structured-data.png", caption="Screaming Frog: Structured Data")
+
+    st.divider()
+    st.markdown("""
+**6. Pobierz dane z Ahrefs o widoczności w AI Overview** - [link do Ahrefs](https://app.ahrefs.com/v2-site-explorer/organic-keywords?brandedMode=all&chartGranularity=monthly&chartInterval=all&chartMetric=Keywords&compareDate=dontCompare&country=allGlobal&currentDate=today&dataMode=keywords&hiddenColumns=AllIntents%7C%7CCPC%7C%7CEntities%7C%7CKD%7C%7COtherIntents%7C%7CPaidTraffic%7C%7CPositionHistory%7C%7CSF%7C%7CUserIntents&intentsAttrs=&keywordRules=&limit=100&localMode=all&mainOnly=0&mode=subdomains&multipleUrlsOnly=0&offset=0&performanceChartTopPosition=top11_20%7C%7Ctop21_50%7C%7Ctop3%7C%7Ctop4_10%7C%7Ctop51&positionChanges=&projectId=2396345&serpMatch=%5B%22All%22%5D&serpRules=%7B%22comparisonMode%22%3A%5B%22Current%22%5D%2C%22mode%22%3A%22ranked%22%2C%22features%22%3A%5B%22ai_overview%22%5D%2C%22featuresMatchType%22%3A%5B%22All%22%5D%7D&sort=OrganicTrafficInitial&sortDirection=desc&target=oralb.pl%2F&urlRules=&volume_type=average)
+
+**7. Pobierz dane z Senuto o widoczności w AI Overview** - [link do Senuto](https://app.senuto.com/visibility-analysis/ai-overviews?domain=oralb.pl&fetch_mode=subdomain&country_id=200)
+
+**8. Zrób screena ze statystykami z "Backlink Profile" z Ahrefs** - [link do Ahrefs Backlinks](https://app.ahrefs.com/v2-site-explorer/overview?backlinksChartMode=metrics&backlinksChartPerformanceSources=domainRating&backlinksCompetitorsSource=%22UrlRating%22&backlinksRefdomainsSource=%22RefDomainsNew%22&bestFilter=all&brandedTrafficChartMetric=organic-traffic&brandedTrafficSource=target-brand&chartGranularity=monthly&chartInterval=year&competitors=&countries=&country=all&entitiesCategory=organisations&generalChartBrandedTraffic=non-branded&generalChartMode=metrics&generalChartPerformanceSources=organicTraffic%7C%7CorganicTrafficValue&generalCompetitorsSource=%22OrganicTraffic%22&generalCountriesSource=organic-traffic&generalEntitiesChartMetric=Traffic&generalPagesByTrafficChartMode=Percentage&generalPagesByTrafficSource=Pages%7C%7CTraffic&highlightChanges=1y&intentsMainSource=informational&keywordsSource=all&mode=subdomains&organicChartBrandedTraffic=non-branded&organicChartMode=metrics&organicChartPerformanceSources=organicTraffic&organicCompetitorsSource=%22OrganicTraffic%22&organicCountriesSource=organic-traffic&organicEntitiesChartMetric=Traffic&organicPagesByTrafficChartMode=Percentage&organicPagesByTrafficSource=Pages&overviewSerpChartMode=Own&overviewSerpChartSpec=AIOverview%7C%7CAdwordsBottom%7C%7CAdwordsTop%7C%7CDiscussions%7C%7CFeaturedSnippet%7C%7CImagePack%7C%7CKnowledgeCard%7C%7CKnowledgePanel%7C%7CLocalPack%7C%7CPaidSiteLinks%7C%7CPeopleAlsoAsk%7C%7CShoppingAds%7C%7CShoppingOrganic%7C%7CSitelinks%7C%7CThumbnail%7C%7CTopStories%7C%7CTweets%7C%7CVideoPreview%7C%7CVideos&overviewSerpManyChartSpec=Own%7C%7CTotal&overview_tab=backlinks&paidSearchPaidKeywordsByTopPositionsChartMode=Percentage&paidTrafficSources=cost%7C%7Ctraffic&projectId=2396345&target=oralb.pl%2F&topLevelDomainFilter=all&topOrganicKeywordsMode=normal&topOrganicPagesMode=normal&trafficType=Organic&volume_type=monthly)
+
+**8. Zrób screeny z Google Search Console** - można oznaczyć moment wejścia AI Overview w Polsce żeby pokazać jak to wpłynęło na kliknięcia
+
+**9. Zrób screen z raportu śledzenia ruchu z LLM z Google Analytics** - [instrukcja](https://toponline.pl/blog/jak-sledze-ruch-z-ai-w-ga4)
+    """)
 
 # --- TAB 1: Dane Podstawowe ---
 with tabs[1]:
