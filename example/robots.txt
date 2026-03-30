@@ -1,0 +1,72 @@
+User-agent: * 
+
+#Product
+Disallow: /*Product-Variation?pid=
+Disallow: /*Wishlist-Add?pid=
+Disallow: /*?source=quickview
+Disallow: /*bvrrp=
+Disallow: /*bvstate=
+Disallow: /checkout/*
+Disallow: /*productId=
+Disallow: /*randomJsCount=“
+
+#Search
+Disallow: /*?cgid=*
+Disallow: */search?cgid
+Disallow: /*recherche?
+Disallow: /*Search-Show?cgid=
+#Disallow: /*wyniki-wyszukiwania?
+Disallow: /default/
+
+#Paramaters
+Disallow: /*cid=
+Disallow: /*prefn*=
+Disallow: /*prefv*=
+Disallow: /*pmin
+Disallow: /*pmax
+Disallow: /*srule
+Disallow: /*cart?dwcont
+Disallow: /*crefn*=
+Disallow: /*crefv*=
+Disallow: /*Product-Show
+Disallow: /*Page-Show
+Disallow: /*?sz= 
+Disallow: /*?listview
+Disallow: /*isPrefSite=*
+Disallow: /*null
+Disallow: /*cvrid=
+Disallow: /?number=
+Disallow: /*bvroute=Reviews
+Disallow: /*bbOrigin=list
+Disallow: /*LGWCODE=
+Disallow: /*rev=BVSpotlights
+Disallow: /*source=productsetvariationselector
+
+#Demandware
+Disallow: /on/demandware.store/*
+Allow: /on/demandware.store/*/Home-GetFooter
+
+#Brand
+Disallow: */*?scgid=*
+Allow: */*?scgid=C*
+
+#Store
+Disallow: /*serviceid=bar-a-sourcils&storeid=
+Disallow: /*serviceid=make-up-bar&storeid=
+Disallow: /*serviceid=service-atelier-gravure&storeid=
+Disallow: /*serviceid=service-gifting&storeid=
+Disallow: /*BookingServices-Show?storeid=
+Disallow: /*all-stores?storeID=
+Disallow: /wyszukaj-perfumerie?storeID=
+Disallow: /sephora-prodejna?storeID=
+
+#Beautyboard
+Disallow: /beautyboard/*
+Allow: /beautyboard/
+
+#Parameters
+Disallow: /*mc=
+Disallow: /*awc=
+
+#tcimage
+Disallow: /catalogs/mastercatalog_sephora/default/images

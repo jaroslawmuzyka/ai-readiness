@@ -107,8 +107,7 @@ commentary_db = {
     "Czy mapa strony XML jest dodana do robots.txt?": "Umieszczenie ścieżki do mapy strony w pliku robots.txt to standardowa praktyka, która ułatwia botom jej odnalezienie.", 
     "Czy mapa strony XML zawiera tylko adresy z kodem 200, kanoniczne, nie zawiera adresów noindex?": "Czysta, wolna od błędów i niepożądanych adresów mapa strony pozwala botom AI efektywniej wykorzystać czas na analizę wartościowych treści, zamiast marnować go na niepożądane przez nas adresy.", 
     "Czy plik robots.txt pozwala agentom LLM i robotom wyszukiwarek na crawlowanie strony?": "Zablokowanie botów np GPTBot może całkowicie uniemożliwiść im wykorzystanie treści na naszej stronie.", 
-    "Czy dodany jest plik llm.txt?": "Obecność pliku llm.txt to nowy sygnał dla systemów AI, który może wspierać wykorzystywanie treści w LLM.", 
-    "Czy plik llm.txt jest poprawnie sformatowany i zawiera najważniejsze podstrony?": "Plik llm.txt może precyzyjnie kontrolować, które dane mogą być używane do trenowania modeli AI.", 
+ 
     "Czy dodany jest certyfikat SSL?": "Protokół HTTPS (SSL) jest fundamentalnym sygnałem zaufania. Strony bez certyfikatu są uznawane za niezabezpieczone co może mieć wpływ na obecność w odpowiedziach AI.", 
     "Czy strona wykorzystuje Breadcrumb?": "Breadcrumby (nawigacja okruszkowa) poza lepszym doświadczeniem użytkowników na stronie może pomagać LLM zrozumieć hierarchię i relacje między podstronami, co jest kluczowe dla generowania trafnych odpowiedzi.",
     "social_media_general": "Profile społecznościowe budują tożsamość i autorytet marki. Modele AI mogą wykorzystywać je do potwierdzenia, że marka jest prawdziwa, aktywna i jest ekspertem w swojej dziedzinie, co zwiększa jej wiarygodność. Regularna aktywność to sygnał, że informacje o marce są aktualne.",
@@ -133,12 +132,15 @@ def read_data_file(file):
     if filename.lower().endswith('.csv'):
         encodings = ['utf-8-sig', 'utf-16', 'utf-8', 'latin-1']
         separators = [';', ',', '\t']
+        best_df = None
         for encoding in encodings:
             for sep in separators:
                 try:
-                    return pd.read_csv(io.BytesIO(content), sep=sep, encoding=encoding)
+                    df = pd.read_csv(io.BytesIO(content), sep=sep, encoding=encoding)
+                    if best_df is None or len(df.columns) > len(best_df.columns):
+                        best_df = df
                 except: continue
-        return None
+        return best_df
     elif filename.lower().endswith('.xlsx'):
         try:
             return pd.read_excel(io.BytesIO(content))
@@ -210,14 +212,15 @@ with tabs[1]:
         "Czy dodane jest 'Article' schema na wpisach blogowych?",
         "Czy dodane jest 'Author' schema na wpisach blogowych i podlinkowane do profili autorów?",
         "Czy autorzy mają stworzone dedykowane podstrony z 'ProfilePage' schema?",
-        "Czy dodane jest 'Breadcrumb' schema?",
-        "Czy dodany jest plik llm.txt?",
-        "Czy plik llm.txt jest poprawnie sformatowany i zawiera najważniejsze podstrony?"
+        "Czy dodane jest 'Breadcrumb' schema?"
     ]
     tech_answers = {}
     cols = st.columns(2)
     for i, q in enumerate(tech_q):
-        tech_answers[q] = cols[i%2].selectbox(q, ["Tak", "Nie", "Do wdrożenia", "Nie dotyczy"], key=f"tech_{i}", help=commentary_db.get(q))
+        ans = cols[i%2].selectbox(q, ["Tak", "Nie", "Do wdrożenia", "Nie dotyczy", "Własny komentarz"], key=f"tech_{i}", help=commentary_db.get(q))
+        if ans == "Własny komentarz":
+            ans = cols[i%2].text_input("📝 Twój komentarz:", key=f"tech_custom_{i}")
+        tech_answers[q] = ans
 
     st.divider()
     st.subheader("Pliki z narzędzi")
@@ -245,7 +248,10 @@ with tabs[2]:
     ]
     content_answers = {}
     for q in content_q:
-        content_answers[q] = st.selectbox(q, ["Tak", "Nie", "Częściowo"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
+        ans = st.selectbox(q, ["Tak", "Nie", "Częściowo", "Własny komentarz"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
+        if ans == "Własny komentarz":
+            ans = st.text_input("📝 Twój komentarz:", key=f"cont_custom_{q}")
+        content_answers[q] = ans
 
     st.divider()
     st.subheader("Social Media")
@@ -264,7 +270,10 @@ with tabs[2]:
         if "podaj link" in q:
             social_answers[q] = st.text_input(q, key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
         else:
-            social_answers[q] = st.selectbox(q, ["Tak", "Nie"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
+            ans = st.selectbox(q, ["Tak", "Nie", "Własny komentarz"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
+            if ans == "Własny komentarz":
+                ans = st.text_input("📝 Twój komentarz:", key=f"soc_custom_{q}")
+            social_answers[q] = ans
 
     st.divider()
     st.subheader("Linkbuilding")
@@ -275,7 +284,10 @@ with tabs[2]:
     ]
     lb_answers = {}
     for q in lb_q:
-        lb_answers[q] = st.selectbox(q, ["Tak", "Nie", "Wymaga analizy"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+        ans = st.selectbox(q, ["Tak", "Nie", "Wymaga analizy", "Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+        if ans == "Własny komentarz":
+            ans = st.text_input("📝 Twój komentarz:", key=f"lb_custom_{q}")
+        lb_answers[q] = ans
     lb_img = st.file_uploader("Screen z Ahrefs (Backlink profile):", type=['png', 'jpg', 'jpeg'])
 
 # --- TAB 4: Generuj Raport ---
@@ -369,7 +381,10 @@ with tabs[3]:
                                 add_strategic_commentary(document, question, commentary_db)
                                 if robots_content:
                                     p_robots = document.add_paragraph(); p_robots.add_run("Zawartość pliku robots.txt:").bold = True
-                                    p_quote = document.add_paragraph(robots_content); p_quote.style = 'Quote'
+                                    table = document.add_table(rows=1, cols=1)
+                                    set_cell_shading(table.cell(0,0), "F0F0F0")
+                                    run = table.cell(0,0).paragraphs[0].add_run(robots_content)
+                                    run.font.name = 'Courier New'
                             else:
                                 add_strategic_commentary(document, question, commentary_db)
 
@@ -420,6 +435,8 @@ with tabs[3]:
                     for q, a in lb_answers.items():
                         doc.add_heading(str(q), level=2)
                         status_icon = "✅" if "tak" in str(a).lower() else "❌" if "nie" in str(a).lower() else "➡️"
+                        if q == "Czy linki przychodzące kierują do stron 404?" and "tak" in str(a).lower():
+                            status_icon = "❌"
                         doc.add_paragraph(f"{status_icon} {a}")
                     
                     if lb_img:
@@ -432,15 +449,18 @@ with tabs[3]:
                         df_ahrefs = read_data_file(ahrefs_file)
                         if df_ahrefs is not None:
                             doc.add_heading('6.1. Zasięgi globalne (Ahrefs)', level=2)
-                            if 'Current URL inside' in df_ahrefs.columns:
-                                df_ahrefs_ai = df_ahrefs[df_ahrefs['Current URL inside'] == 'AI Overview'].sort_values(by='Organic traffic', ascending=False)
-                                add_styled_table(doc, df_ahrefs_ai.head(5), "Top 5 fraz z AI Overview")
+                            if len(df_ahrefs.columns) > 1 and 'Current URL inside' in df_ahrefs.columns:
+                                df_ahrefs_ai = df_ahrefs[df_ahrefs['Current URL inside'].astype(str).str.contains('AI Overview', case=False, na=False)].sort_values(by='Organic traffic', ascending=False)
+                                add_styled_table(doc, df_ahrefs_ai.head(10), "Top 10 fraz z AI Overview")
                     
                     if senuto_file:
                         df_senuto = read_data_file(senuto_file)
                         if df_senuto is not None:
                             doc.add_heading('6.2. Widoczność lokalna (Senuto)', level=2)
-                            add_styled_table(doc, df_senuto.iloc[:, :4].head(5), "Top 5 fraz - Senuto")
+                            senuto_cols = ['Słowo kluczowe', 'Pozycja organiczna', 'Najlepsza pozycja w AIO', 'URL najlepszej pozycji w AIO']
+                            available_senuto = [c for c in senuto_cols if c in df_senuto.columns]
+                            if available_senuto:
+                                add_styled_table(doc, df_senuto[available_senuto].head(10), "Top 10 fraz w AI Overviews (Senuto)")
 
                     # Screaming Frog Data
                     if sf_file:
@@ -460,8 +480,15 @@ with tabs[3]:
                             if all(c in df_sf.columns for c in cwv_cols):
                                 doc.add_heading('7.2. Core Web Vitals', level=2)
                                 add_strategic_commentary(doc, 'core_web_vitals', commentary_db)
-                                # Simple summary table for brevity in report
-                                doc.add_paragraph("Szczegóły znajdują się w załączonym pliku Excel.")
+                                
+                                lcp_df = df_sf[['Address', 'Largest Contentful Paint Time (ms)']].sort_values(by='Largest Contentful Paint Time (ms)', ascending=False).head(5)
+                                add_styled_table(doc, lcp_df, "Najwolniejsze strony (LCP)")
+                                
+                                cls_df = df_sf[['Address', 'Cumulative Layout Shift']].sort_values(by='Cumulative Layout Shift', ascending=False).head(5)
+                                add_styled_table(doc, cls_df, "Strony z najwyższym przesunięciem (CLS)")
+                                
+                                fcp_df = df_sf[['Address', 'First Contentful Paint Time (ms)']].sort_values(by='First Contentful Paint Time (ms)', ascending=False).head(5)
+                                add_styled_table(doc, fcp_df, "Najwolniejsze ładowanie treści (FCP)")
 
                             # Errors 4xx
                             if 'Status Code' in df_sf.columns:
@@ -482,7 +509,13 @@ with tabs[3]:
                         if df_schema is not None:
                             doc.add_heading('7.5. Dane Strukturalne (Schema)', level=2)
                             add_strategic_commentary(doc, 'schema_data', commentary_db)
-                            add_styled_table(doc, df_schema.iloc[:, :3].head(10), "Podgląd najistotniejszych danych Schema")
+                            
+                            if 'Indexability' in df_schema.columns and 'Address' in df_schema.columns:
+                                df_s = df_schema[df_schema['Indexability'] == 'Indexable'].sort_values('Address', ascending=True)
+                                type_cols = [c for c in df_s.columns if c.startswith('Type-')][:5]
+                                cols_to_show = ['Address'] + type_cols
+                                add_styled_table(doc, df_s[cols_to_show].head(10), "Znalezione elementy Schema (Top 10)")
+                                doc.add_paragraph("Pełne błędy, ostrzeżenia i wszystkie wykryte typy schema dla wszystkich adresów znajdują się w dołączonym arkuszu XLSX.")
 
                     # 3. XLSX Generation
                     xlsx_buffer = io.BytesIO()
@@ -521,23 +554,28 @@ with tabs[3]:
                     
                     st.success("Raport wygenerowany!")
                     
-                    col1, col2 = st.columns(2)
-                    col1.download_button(
-                        label="📥 Pobierz Raport DOCX",
-                        data=doc_io,
-                        file_name=f"Raport_AI_Readiness_{client_name if client_name else 'Klient'}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-                    col2.download_button(
-                        label="📥 Pobierz Dane XLSX",
-                        data=xlsx_buffer.getvalue(),
-                        file_name=f"Dane_AI_Readiness_{client_name if client_name else 'Klient'}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-
+                    st.session_state['ready_docx'] = doc_io.getvalue()
+                    st.session_state['ready_xlsx'] = xlsx_buffer.getvalue()
+                    st.session_state['ready_client'] = client_name
+                    
                 except Exception as e:
                     st.error(f"Błąd podczas generowania: {e}")
                     st.code(traceback.format_exc())
+
+    if st.session_state.get('ready_docx') and st.session_state.get('ready_xlsx'):
+        col1, col2 = st.columns(2)
+        col1.download_button(
+            label="📥 Pobierz Raport DOCX",
+            data=st.session_state['ready_docx'],
+            file_name=f"Raport_AI_Readiness_{st.session_state.get('ready_client', 'Klient')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        col2.download_button(
+            label="📥 Pobierz Dane XLSX",
+            data=st.session_state['ready_xlsx'],
+            file_name=f"Dane_AI_Readiness_{st.session_state.get('ready_client', 'Klient')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 st.sidebar.markdown(f"""
 ### Status Projektu
@@ -558,7 +596,7 @@ def load_example_data():
     st.session_state["client_input"] = "Oral-B"
     st.session_state["use_example_files"] = True
     # Tech
-    for i in range(19):
+    for i in range(17):
         st.session_state[f"tech_{i}"] = "Tak"
     # Content
     content_questions = [
