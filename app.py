@@ -1045,7 +1045,11 @@ with tabs[6]:
                         if sf_file:
                             df_sf_m = read_data_file(sf_file)
                             if df_sf_m is not None and all(c in df_sf_m.columns for c in ['Status Code', 'Meta Description 1']):
-                                df200_xlsx = df_sf_m[df_sf_m['Status Code'] == 200][['Address', 'Meta Description 1']].copy()
+                                # Wymagamy Indexability jeśli chcemy po niej filtrować
+                                if 'Indexability' in df_sf_m.columns:
+                                    df200_xlsx = df_sf_m[(df_sf_m['Status Code'] == 200) & (df_sf_m['Indexability'] == 'Indexable')][['Address', 'Meta Description 1']].copy()
+                                else:
+                                    df200_xlsx = df_sf_m[df_sf_m['Status Code'] == 200][['Address', 'Meta Description 1']].copy()
                                 empty_xl = df200_xlsx[df200_xlsx['Meta Description 1'].isna() | (df200_xlsx['Meta Description 1'].astype(str).str.strip() == '')]
                                 dupl_xl = df200_xlsx[df200_xlsx.duplicated(subset=['Meta Description 1'], keep=False) & df200_xlsx['Meta Description 1'].notna() & (df200_xlsx['Meta Description 1'].astype(str).str.strip() != '')]
                                 if not empty_xl.empty:
