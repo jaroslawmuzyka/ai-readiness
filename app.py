@@ -32,7 +32,7 @@ st.markdown("""
         width: 100%;
         border-radius: 5px;
         height: 3em;
-        background-color: #4F81BD;
+        background-color: #003366;
         color: white;
         font-weight: bold;
     }
@@ -40,7 +40,7 @@ st.markdown("""
         width: 100%;
         border-radius: 5px;
         height: 3em;
-        background-color: #2ecc71;
+        background-color: #006699;
         color: white;
         font-weight: bold;
     }
@@ -50,7 +50,7 @@ st.markdown("""
         background-color: white;
     }
     h1, h2, h3 {
-        color: #2c3e50;
+        color: #003366;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -164,7 +164,7 @@ def add_hyperlink(paragraph, text, url):
     hyperlink.append(new_run)
     r = paragraph.add_run()
     r._r.append(hyperlink)
-    r.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+    r.font.color.rgb = RGBColor(0x00, 0x66, 0x99)
     r.font.underline = True
     return hyperlink
 
@@ -217,7 +217,7 @@ with tabs[1]:
     tech_answers = {}
     cols = st.columns(2)
     for i, q in enumerate(tech_q):
-        tech_answers[q] = cols[i%2].selectbox(q, ["Tak", "Nie", "Do wdrożenia", "Nie dotyczy"], key=f"tech_{i}")
+        tech_answers[q] = cols[i%2].selectbox(q, ["Tak", "Nie", "Do wdrożenia", "Nie dotyczy"], key=f"tech_{i}", help=commentary_db.get(q))
 
     st.divider()
     st.subheader("Pliki z narzędzi")
@@ -245,7 +245,7 @@ with tabs[2]:
     ]
     content_answers = {}
     for q in content_q:
-        content_answers[q] = st.selectbox(q, ["Tak", "Nie", "Częściowo"], key=f"cont_{q}")
+        content_answers[q] = st.selectbox(q, ["Tak", "Nie", "Częściowo"], key=f"cont_{q}", help=commentary_db.get(q, commentary_db.get("tresci_general")))
 
     st.divider()
     st.subheader("Social Media")
@@ -262,9 +262,9 @@ with tabs[2]:
     social_answers = {}
     for q in social_q:
         if "podaj link" in q:
-            social_answers[q] = st.text_input(q, key=f"soc_{q}")
+            social_answers[q] = st.text_input(q, key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
         else:
-            social_answers[q] = st.selectbox(q, ["Tak", "Nie"], key=f"soc_{q}")
+            social_answers[q] = st.selectbox(q, ["Tak", "Nie"], key=f"soc_{q}", help=commentary_db.get(q, commentary_db.get("social_media_general")))
 
     st.divider()
     st.subheader("Linkbuilding")
@@ -275,7 +275,7 @@ with tabs[2]:
     ]
     lb_answers = {}
     for q in lb_q:
-        lb_answers[q] = st.selectbox(q, ["Tak", "Nie", "Wymaga analizy"], key=f"lb_{q}")
+        lb_answers[q] = st.selectbox(q, ["Tak", "Nie", "Wymaga analizy"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
     lb_img = st.file_uploader("Screen z Ahrefs (Backlink profile):", type=['png', 'jpg', 'jpeg'])
 
 # --- TAB 4: Generuj Raport ---
@@ -297,6 +297,13 @@ with tabs[3]:
 
                     # 2. DOCX Generation
                     doc = Document()
+                    
+                    # Apply brand colors to Word styles
+                    for style_name, hex_color in [('Heading 1', 0x003366), ('Heading 2', 0x006699), ('Heading 3', 0xFF9900), ('Title', 0x003366), ('Subtitle', 0x006699)]:
+                        try:
+                            if style_name in doc.styles:
+                                doc.styles[style_name].font.color.rgb = RGBColor((hex_color >> 16) & 255, (hex_color >> 8) & 255, hex_color & 255)
+                        except: pass
                     # Header with Logo
                     p = doc.add_paragraph()
                     if logo_bytes:
@@ -356,7 +363,7 @@ with tabs[3]:
                         table = document.add_table(rows=1, cols=len(df.columns)); table.style = 'Table Grid'
                         hdr_cells = table.rows[0].cells
                         for i, column_name in enumerate(df.columns):
-                            p = hdr_cells[i].paragraphs[0]; run = p.add_run(str(column_name)); run.font.bold = True; run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF); set_cell_shading(hdr_cells[i], "4F81BD")
+                            p = hdr_cells[i].paragraphs[0]; run = p.add_run(str(column_name)); run.font.bold = True; run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF); set_cell_shading(hdr_cells[i], "003366")
                         for index, row in df.head(10).iterrows(): # Limit to top 10 for visibility
                             row_cells = table.add_row().cells
                             for i, cell_value in enumerate(row): row_cells[i].text = str(cell_value)
@@ -453,6 +460,15 @@ with tabs[3]:
                             df_ahrefs = read_data_file(ahrefs_file)
                             if df_ahrefs is not None:
                                 df_ahrefs.to_excel(writer, sheet_name='Ahrefs AIO', index=False)
+
+                        # Styling XLSX z kolorami brandowymi
+                        header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+                        header_font = Font(color="FFFFFF", bold=True)
+                        for sheetname in writer.sheets:
+                            ws = writer.sheets[sheetname]
+                            for cell in ws[1]:
+                                cell.fill = header_fill
+                                cell.font = header_font
 
                     # Final export
                     doc_io = io.BytesIO()
