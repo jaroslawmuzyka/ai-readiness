@@ -572,7 +572,12 @@ with tabs[4]:
     ]
     lb_answers = {}
     for q in lb_q:
-        ans = st.selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "➡️ Wymaga analizy", "💬 Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+        if "kierują do stron 404" in q:
+            st.markdown(f"**{q}**\n👉 [Link do Ahrefs (Broken Backlinks)](https://app.ahrefs.com/v2-site-explorer/broken-backlinks?anchorRules=&bestFilter=all&domainNameRules=&followType=all&grouping=all&hiddenColumns=&limit=100&mode=subdomains&offset=0&projectId=2396345&refPageAuthorRules=&refPageTitleRules=&refPageUrlRules=&sort=Traffic&sortDirection=desc&surroundingRules=&target=oralb.pl%2F&targetUrlRules=)")
+            ans = st.selectbox("Odpowiedź:", ["— Wybierz —", "✅ Tak", "❌ Nie", "➡️ Wymaga analizy", "💬 Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+        else:
+            ans = st.selectbox(q, ["— Wybierz —", "✅ Tak", "❌ Nie", "➡️ Wymaga analizy", "💬 Własny komentarz"], key=f"lb_{q}", help=commentary_db.get(q, commentary_db.get("linkbuilding_general")))
+            
         if ans == "💬 Własny komentarz":
             ans = st.text_input("📝 Twój komentarz:", key=f"lb_custom_{q}")
         clean = ans.replace("✅ ", "").replace("❌ ", "").replace("➡️ ", "").replace("💬 ", "").replace("— Wybierz —", "") if isinstance(ans, str) else ans
