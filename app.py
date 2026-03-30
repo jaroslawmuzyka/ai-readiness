@@ -183,8 +183,8 @@ tabs = st.tabs(["📁 Dane Podstawowe", "🔧 Audyt Techniczny", "✍️ Treści
 with tabs[0]:
     col1, col2 = st.columns([1, 1])
     with col1:
-        analyzed_url = st.text_input("Adres analizowanej strony:", placeholder="https://example.com")
-        client_name = st.text_input("Nazwa Klienta:", placeholder="Firma X")
+        analyzed_url = st.text_input("Adres analizowanej strony:", placeholder="https://example.com", key="url_input")
+        client_name = st.text_input("Nazwa Klienta:", placeholder="Firma X", key="client_input")
     with col2:
         logo_file = st.file_uploader("Logo Klienta (PNG, JPG, SVG):", type=['png', 'jpg', 'jpeg', 'svg'])
         if logo_file:
@@ -518,3 +518,80 @@ if not analyzed_url:
     st.sidebar.warning("Uzupełnij dane w pierwszej zakładce!")
 else:
     st.sidebar.success("Projekt zainicjowany.")
+
+st.sidebar.divider()
+st.sidebar.subheader("💡 Przykładowe Narzędzie")
+st.sidebar.markdown("Zobacz jak wygląda gotowy raport lub przetestuj narzędzie używając przykładowych danych.")
+
+def load_example_data():
+    st.session_state["url_input"] = "https://oralb.pl"
+    st.session_state["client_input"] = "Oral-B"
+    # Tech
+    for i in range(19):
+        st.session_state[f"tech_{i}"] = "Tak"
+    # Content
+    content_questions = [
+        "Czy Twoje najważniejsze strony zostały zaktualizowane w ciągu ostatnich 6 miesięcy?",
+        "Czy widoczne są daty publikacji i ostatniej modyfikacji?",
+        "Czy podstrony zawierają unikalną treść?",
+        "Czy kluczowe strony zawierają sekcje FAQ?",
+        "Czy dodane są linki do źródeł naukowych, raportów branżowych albo źródeł pierwotnych?"
+    ]
+    for q in content_questions:
+        st.session_state[f"cont_{q}"] = "Tak"
+    # Social Medias
+    social_questions = [
+        "Czy marka ma utworzony profil społecznościowy na Facebook? (podaj link)",
+        "Czy marka ma utworzony profil społecznościowy na Instagram? (podaj link)",
+        "Czy marka ma utworzony profil społecznościowy na Tiktok? (podaj link)",
+        "Czy marka ma utworzony profil społecznościowy na Youtube? (podaj link)",
+        "Czy w ciągu ostatniego miesiaca został dodany materiał na Facebook?",
+        "Czy w ciągu ostatniego miesiaca został dodany materiał na Instagram?",
+        "Czy w ciągu ostatniego miesiaca został dodany materiał na Tiktok?",
+        "Czy w ciągu ostatniego miesiaca został dodany materiał na Youtube?"
+    ]
+    for q in social_questions:
+        if "podaj link" in q:
+            st.session_state[f"soc_{q}"] = "https://facebook.com/oralb" if "Facebook" in q else "https://instagram.com/oralb"
+        else:
+            st.session_state[f"soc_{q}"] = "Tak"
+    # Linkbuilding
+    lb_questions = [
+        "Czy autorytet strony wyrażony DR rośnie lub jest stabilny?",
+        "Czy stronie stale przybywa linków przychodzących?",
+        "Czy linki przychodzące kierują do stron 404?"
+    ]
+    for q in lb_questions:
+        st.session_state[f"lb_{q}"] = "Tak"
+    # LLM Options
+    llm_models_list = ["ChatGPT", "Gemini", "Claude", "Perplexity", "Grok", "DeepSeek", "Bing (Copilot)"]
+    for model in llm_models_list:
+        st.session_state[f"op_{model}"] = "Marka Oral-B według modelu AI jest powszechnie uznawana za jednego z najpopularniejszych liderów zaufania z dziedziny pielęgnacji jamy ustnej. Rekomendowana przez dentystów na całym świecie..."
+        st.session_state[f"zg_{model}"] = "Większość wygenerowanych danych technicznych jest w pełnej zgodności ze stanem faktycznym i rynkową wiedzą ekspercką."
+
+if st.sidebar.button("✨ Uzupełnij formularz", on_click=load_example_data):
+    st.sidebar.success("Formularz wypełniony danymi Oral-B!")
+
+try:
+    with open("example/Raport_AI_Readiness_Ekspercki (19).docx", "rb") as f:
+        docx_bytes = f.read()
+    st.sidebar.download_button(
+        label="📄 Pobierz wzór Raportu (DOCX)",
+        data=docx_bytes,
+        file_name="Przykladowy_Raport_AI_Readiness_OralB.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+except Exception as e:
+    st.sidebar.error(f"Brak pliku przykładowego DOCX w /example")
+
+try:
+    with open("example/Analiza_Techniczna_Wyniki (18).xlsx", "rb") as f:
+        xlsx_bytes = f.read()
+    st.sidebar.download_button(
+        label="📊 Pobierz wzór Danych (XLSX)",
+        data=xlsx_bytes,
+        file_name="Przykladowa_Analiza_Techniczna_OralB.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+except Exception as e:
+    st.sidebar.error(f"Brak pliku przykładowego XLSX w /example")
