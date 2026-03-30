@@ -582,9 +582,9 @@ with tabs[4]:
 # --- TAB 5: Analiza Semantyczna ---
 with tabs[5]:
     st.subheader("🧠 Analiza Semantyczna Pojedynczego Wpisu")
-    st.markdown("""Ta zakładka opisuje **dodatkową, płatną usługę audytu Content Intelligence** — pogłębioną analizę pojedynczego artykułu pod kątem algorytmów Google i modeli AI takich jak ChatGPT czy Google AI Overviews.
-    
-> 💡 Do indywidualnej wyceny.""", unsafe_allow_html=False)
+    st.markdown("""Ta zakładka opisuje dodatkową, płatną usługę audytu Content Intelligence - pogłębioną analizę pojedynczego artykułu pod kątem algorytmów Google i LLMów. Poniższa analiza wykonuje się w 98% automatycznie (przy pomocy Claude Code) jednak wymaga później ręcznego sprawdzenia. 
+
+Możemy dodać taką analizę do audytu AI Readiness jako gratis żeby zachęcić do skorzystania z usługi.""", unsafe_allow_html=False)
     st.divider()
 
     with st.expander("🎯 Wstęp: Jak Google i AI czytają Twoje treści?", expanded=True):
